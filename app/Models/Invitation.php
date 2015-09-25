@@ -1,5 +1,6 @@
 <?php namespace App\Models;
 
+use Utils;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invitation extends EntityModel
@@ -32,14 +33,14 @@ class Invitation extends EntityModel
         if (!$this->account) {
             $this->load('account');
         }
-        
+
         $url = SITE_URL;
+        $iframe_url = $this->account->iframe_url;
                 
-        if ($this->account->subdomain) {
-            $parsedUrl = parse_url($url);
-            $host = explode('.', $parsedUrl['host']);
-            $subdomain = $host[0];
-            $url = str_replace("://{$subdomain}.", "://{$this->account->subdomain}.", $url);
+        if ($iframe_url) {
+            return "{$iframe_url}/?{$this->invitation_key}";
+        } else if ($this->account->subdomain) {
+            $url = Utils::replaceSubdomain($url, $this->subdomain);
         }
 
         return "{$url}/view/{$this->invitation_key}";

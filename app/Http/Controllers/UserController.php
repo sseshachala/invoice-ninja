@@ -384,4 +384,5 @@ class UserController extends BaseController
     {
         return View::make('users.account_management');
     }
+
 }

@@ -25,7 +25,7 @@
         <div class="pull-right" style="text-align:right">
         @if ($invoice->is_quote)            
             {!! Button::normal(trans('texts.download_pdf'))->withAttributes(['onclick' => 'onDownloadClick()'])->large() !!}&nbsp;&nbsp;
-            @if (!$isConverted)
+            @if ($showApprove)
                 {!! Button::success(trans('texts.approve'))->asLinkTo(URL::to('/approve/' . $invitation->invitation_key))->large() !!}
             @endif
 		@elseif ($invoice->client->account->isGatewayConfigured() && !$invoice->isPaid() && !$invoice->is_recurring)
@@ -50,11 +50,19 @@
 			invoice.contact = {!! $contact->toJson() !!};
 
 			function getPDFString(cb) {
-    	  	    generatePDF(invoice, invoice.invoice_design.javascript, true, cb);
+    	  	    return generatePDF(invoice, invoice.invoice_design.javascript, true, cb);
 			}
 
 			$(function() {
-				refreshPDF();
+                @if (Input::has('phantomjs'))
+                    doc = getPDFString();
+                    doc.getDataUrl(function(pdfString) {
+                        document.write(pdfString);
+                        document.close();
+                    });
+                @else 
+                    refreshPDF();
+                @endif
 			});
 			
 			function onDownloadClick() {
@@ -62,7 +70,6 @@
                 var fileName = invoice.is_quote ? invoiceLabels.quote : invoiceLabels.invoice;
 				doc.save(fileName + '-' + invoice.invoice_number + '.pdf');
 			}
-
 
 		</script>
 

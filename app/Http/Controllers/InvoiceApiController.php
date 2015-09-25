@@ -24,13 +24,19 @@ class InvoiceApiController extends Controller
         $this->mailer = $mailer;
     }
 
-    public function index()
+    public function index($clientPublicId = false)
     {
         $invoices = Invoice::scope()
                         ->with('client', 'invitations.account')
-                        ->where('invoices.is_quote', '=', false)
-                        ->orderBy('created_at', 'desc')
-                        ->get();
+                        ->where('invoices.is_quote', '=', false);
+
+        if ($clientPublicId) {
+            $invoices->whereHas('client', function($query) use ($clientPublicId) {
+                $query->where('public_id', '=', $clientPublicId);
+            });
+        }
+
+        $invoices = $invoices->orderBy('created_at', 'desc')->get();
 
         // Add the first invitation link to the data
         foreach ($invoices as $key => $invoice) {
@@ -56,12 +62,10 @@ class InvoiceApiController extends Controller
         // check if the invoice number is set and unique
         if (!isset($data['invoice_number']) && !isset($data['id'])) {
             $data['invoice_number'] = Auth::user()->account->getNextInvoiceNumber();
-        } else if (isset($data['invoice_number'])) {            
+        } else if (isset($data['invoice_number'])) {
             $invoice = Invoice::scope()->where('invoice_number', '=', $data['invoice_number'])->first();
             if ($invoice) {
                 $error = trans('validation.unique', ['attribute' => 'texts.invoice_number']);
-            } else {
-                $data['id'] = $invoice->public_id;
             }
         }
 
@@ -102,7 +106,7 @@ class InvoiceApiController extends Controller
         if ($error) {
             $response = json_encode($error, JSON_PRETTY_PRINT);
         } else {
-            $data = self::prepareData($data);
+            $data = self::prepareData($data, $client);
             $data['client_id'] = $client->id;
             $invoice = $this->invoiceRepo->save(false, $data, false);
 
@@ -130,10 +134,10 @@ class InvoiceApiController extends Controller
         return Response::make($response, $error ? 400 : 200, $headers);
     }
 
-    private function prepareData($data)
+    private function prepareData($data, $client)
     {
         $account = Auth::user()->account;
-        $account->loadLocalizationSettings();
+        $account->loadLocalizationSettings($client);
         
         // set defaults for optional fields
         $fields = [

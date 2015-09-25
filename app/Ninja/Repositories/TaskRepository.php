@@ -45,8 +45,22 @@ class TaskRepository
         return $query;
     }
 
+    public function getErrors($input)
+    {
+        $rules = [
+            'time_log' => 'time_log',
+        ];
+        $validator = \Validator::make($input, $rules);
+
+        if ($validator->fails()) {
+            return $validator;
+        }
+        
+        return false;
+    }
+
     public function save($publicId, $data)
-    {        
+    {
         if ($publicId) {
             $task = Task::scope($publicId)->firstOrFail();
         } else {
@@ -68,15 +82,19 @@ class TaskRepository
             $timeLog = [];
         }
 
-        if ($data['action'] == 'start') {
-            $task->is_running = true;
-            $timeLog[] = [strtotime('now'), false];
-        } else if ($data['action'] == 'resume') {
-            $task->is_running = true;
-            $timeLog[] = [strtotime('now'), false];
-        } else if ($data['action'] == 'stop' && $task->is_running) {
-            $timeLog[count($timeLog)-1][1] = time();
-            $task->is_running = false;
+        array_multisort($timeLog);
+
+        if (isset($data['action'])) {
+            if ($data['action'] == 'start') {
+                $task->is_running = true;
+                $timeLog[] = [strtotime('now'), false];
+            } else if ($data['action'] == 'resume') {
+                $task->is_running = true;
+                $timeLog[] = [strtotime('now'), false];
+            } else if ($data['action'] == 'stop' && $task->is_running) {
+                $timeLog[count($timeLog)-1][1] = time();
+                $task->is_running = false;
+            }
         }
 
         $task->time_log = json_encode($timeLog);

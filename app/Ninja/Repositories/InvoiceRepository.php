@@ -7,9 +7,15 @@ use App\Models\InvoiceItem;
 use App\Models\Invitation;
 use App\Models\Product;
 use App\Models\Task;
+use App\Services\PaymentService;
 
 class InvoiceRepository
 {
+    public function __construct(PaymentService $paymentService)
+    {
+        $this->paymentService = $paymentService;
+    }
+
     public function getInvoices($accountId, $clientPublicId = false, $entityType = ENTITY_INVOICE, $filter = false)
     {
         $query = \DB::table('invoices')
@@ -190,7 +196,7 @@ class InvoiceRepository
     }
 
     private function getStatusLabel($statusId, $statusName) {
-        $label = trans("texts.{$statusName}");
+        $label = trans("texts.status_" . strtolower($statusName));
         $class = 'default';
         switch ($statusId) {
             case INVOICE_STATUS_SENT:
@@ -206,7 +212,7 @@ class InvoiceRepository
                 $class = 'success';
                 break;
         }
-        return "<h4><div class=\"label label-{$class}\">$statusName</div></h4>";
+        return "<h4><div class=\"label label-{$class}\">$label</div></h4>";
     }
 
     public function getErrors($input)
@@ -283,10 +289,15 @@ class InvoiceRepository
         }
         
         if ($invoice->is_recurring) {
+            if ($invoice->start_date && $invoice->start_date != Utils::toSqlDate($data['start_date'])) {
+                $invoice->last_sent_date = null;
+            }
+
             $invoice->frequency_id = $data['frequency_id'] ? $data['frequency_id'] : 0;
             $invoice->start_date = Utils::toSqlDate($data['start_date']);
             $invoice->end_date = Utils::toSqlDate($data['end_date']);
             $invoice->due_date = null;
+            $invoice->auto_bill = isset($data['auto_bill']) && $data['auto_bill'] ? true : false;
         } else {
             $invoice->due_date = isset($data['due_date_sql']) ? $data['due_date_sql'] : Utils::toSqlDate($data['due_date']);
             $invoice->frequency_id = 0;
@@ -635,9 +646,36 @@ class InvoiceRepository
             $invoice->invitations()->save($invitation);
         }
 
-        $recurInvoice->last_sent_date = Carbon::now()->toDateTimeString();
+        $recurInvoice->last_sent_date = date('Y-m-d');
         $recurInvoice->save();
 
+        if ($recurInvoice->auto_bill) {
+            if ($this->paymentService->autoBillInvoice($invoice)) {
+                $invoice->invoice_status_id = INVOICE_STATUS_PAID;
+            }
+        }
+
         return $invoice;
+    }
+
+    public function findNeedingReminding($account)
+    {
+        $dates = [];
+        for ($i=1; $i<=3; $i++) {
+            $field = "enable_reminder{$i}";
+            if (!$account->$field) {
+                continue;
+            }
+            $field = "num_days_reminder{$i}";
+            $dates[] = "due_date = '" . date('Y-m-d', strtotime("- {$account->$field} days")) . "'";
+        }
+        $sql = implode(' OR ', $dates);
+
+        $invoices = Invoice::whereAccountId($account->id)
+                    ->where('balance', '>', 0)
+                    ->whereRaw($sql)
+                    ->get();
+
+        return $invoices;
     }
 }

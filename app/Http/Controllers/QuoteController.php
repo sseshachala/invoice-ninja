@@ -53,7 +53,7 @@ class QuoteController extends BaseController
         $data = [
           'title' => trans('texts.quotes'),
           'entityType' => ENTITY_QUOTE,
-          'columns' => Utils::trans(['checkbox', 'quote_number', 'client', 'quote_date', 'quote_total', 'due_date', 'status', 'action']),
+          'columns' => Utils::trans(['checkbox', 'quote_number', 'client', 'quote_date', 'quote_total', 'valid_until', 'status', 'action']),
         ];
 
     /*
@@ -156,6 +156,7 @@ class QuoteController extends BaseController
           'currencies' => Cache::get('currencies'),
           'sizes' => Cache::get('sizes'),
           'paymentTerms' => Cache::get('paymentTerms'),
+          'languages' => Cache::get('languages'),
           'industries' => Cache::get('industries'),
           'invoiceDesigns' => InvoiceDesign::getDesigns(),
           'invoiceLabels' => Auth::user()->account->getInvoiceLabels(),

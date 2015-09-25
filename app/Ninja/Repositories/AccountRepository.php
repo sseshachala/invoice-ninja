@@ -26,8 +26,14 @@ class AccountRepository
         $account->ip = Request::getClientIp();
         $account->account_key = str_random(RANDOM_KEY_LENGTH);
 
-        if (Session::has(SESSION_LOCALE)) {
-            $locale = Session::get(SESSION_LOCALE);
+        // Track referal code
+        if ($referralCode = Session::get(SESSION_REFERRAL_CODE)) {
+            if ($user = User::whereReferralCode($referralCode)->first()) {
+                $account->referral_user_id = $user->id;
+            }
+        }
+
+        if ($locale = Session::get(SESSION_LOCALE)) {
             if ($language = Language::whereLocale($locale)->first()) {
                 $account->language_id = $language->id;
             }
@@ -188,7 +194,7 @@ class AccountRepository
             $accountGateway->user_id = $user->id;
             $accountGateway->gateway_id = NINJA_GATEWAY_ID;
             $accountGateway->public_id = 1;
-            $accountGateway->config = NINJA_GATEWAY_CONFIG;
+            $accountGateway->config = env(NINJA_GATEWAY_CONFIG);
             $account->account_gateways()->save($accountGateway);
         }
 
@@ -206,7 +212,7 @@ class AccountRepository
             $client->public_id = $account->id;
             $client->user_id = $ninjaAccount->users()->first()->id;
             $client->currency_id = 1;
-            foreach (['name', 'address1', 'address2', 'city', 'state', 'postal_code', 'country_id', 'work_phone'] as $field) {
+            foreach (['name', 'address1', 'address2', 'city', 'state', 'postal_code', 'country_id', 'work_phone', 'language_id'] as $field) {
                 $client->$field = $account->$field;
             }
             $ninjaAccount->clients()->save($client);
@@ -227,7 +233,11 @@ class AccountRepository
 
     public function registerUser($user)
     {
-        $url = (Utils::isNinjaDev() ? '' : NINJA_APP_URL) . '/signup/register';
+        if ($user->email == TEST_USERNAME) {
+            return false;
+        }
+
+        $url = (Utils::isNinjaDev() ? SITE_URL : NINJA_APP_URL) . '/signup/register';
         $data = '';
         $fields = [
             'first_name' => urlencode($user->first_name),
@@ -244,6 +254,7 @@ class AccountRepository
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, count($fields));
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_exec($ch);
         curl_close($ch);
     }
@@ -385,5 +396,22 @@ class AccountRepository
             $userAccount->removeUserId($userId);
             $userAccount->save();
         }
+    }
+
+    public function findWithReminders()
+    {
+        return Account::whereRaw('enable_reminder1 = 1 OR enable_reminder2 = 1 OR enable_reminder3 = 1')->get();
+    }
+
+    public function getReferralCode()
+    {
+        do {
+            $code = strtoupper(str_random(8));
+            $match = User::whereReferralCode($code)
+                        ->withTrashed()
+                        ->first();
+        } while ($match);
+        
+        return $code;
     }
 }

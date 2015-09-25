@@ -137,9 +137,9 @@
                 setBulkActionsEnabled();
             }); 
 
-            $('tbody tr').click(function(event) {        
+            $('tbody tr').unbind('click').click(function(event) {
                 if (event.target.type !== 'checkbox' && event.target.type !== 'button' && event.target.tagName.toLowerCase() !== 'a') {
-                    $checkbox = $(this).closest('tr').find(':checkbox:not(:disabled)');             
+                    $checkbox = $(this).closest('tr').find(':checkbox:not(:disabled)');
                     var checked = $checkbox.prop('checked');
                     $checkbox.prop('checked', !checked);
                     setBulkActionsEnabled();

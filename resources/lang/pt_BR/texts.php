@@ -183,7 +183,7 @@ return array(
   'users' => 'Usuários',
   'localization' => 'Localização',
   'remove_logo' => 'Remover logo',
-  'logo_help' => 'Suportados: JPEG, GIF and PNG. Altura recomendada: 120px',
+  'logo_help' => 'Suportados: JPEG, GIF and PNG',
   'payment_gateway' => 'Provedor de Pagamento',
   'gateway_id' => 'Provedor',
   'email_notifications' => 'Notificações por Email',
@@ -417,7 +417,7 @@ return array(
 
   'confirm_email_invoice' => 'Are you sure you want to email this invoice?',
   'confirm_email_quote' => 'Are you sure you want to email this quote?',
-  'confirm_recurring_email_invoice' => 'Recurring is enabled, are you sure you want this invoice emailed?',
+  'confirm_recurring_email_invoice' => 'Are you sure you want this invoice emailed?',
 
   'cancel_account' => 'Cancel Account',
   'cancel_account_message' => 'Warning: This will permanently erase all of your data, there is no undo.',
@@ -747,8 +747,43 @@ return array(
   'customize_help' => '<p>We use <a href="http://pdfmake.org/" target="_blank">pdfmake</a> to define the invoice designs declaratively. The pdfmake <a href="http://pdfmake.org/playground.html" target="_blank">playground</a> provide\'s a great way to see the library in action.</p>
                         <p>You can access any invoice field by adding <code>Value</code> to the end. For example <code>$invoiceNumberValue</code> displays the invoice number.</p>
                         <p>To access a child property using dot notation. For example to show the client name you could use <code>$client.nameValue</code>.</p>
-                        <p>If you need help figuring something out post a question to our <a href="https://www.invoiceninja.com/forums/forum/support/" target="_blank">support forum</a>.</p>'
+                        <p>If you need help figuring something out post a question to our <a href="https://www.invoiceninja.com/forums/forum/support/" target="_blank">support forum</a>.</p>',
   
+  'invoice_due_date' => 'Due Date',
+  'quote_due_date' => 'Valid Until',
+  'valid_until' => 'Valid Until',
+  'reset_terms' => 'Reset terms',
+  'reset_footer' => 'Reset footer',
+  'invoices_sent' => ':count invoice sent|:count invoices sent',
+  'status_draft' => 'Draft',
+  'status_sent' => 'Sent',
+  'status_viewed' => 'Viewed',
+  'status_partial' => 'Partial',
+  'status_paid' => 'Paid',
+  'show_line_item_tax' => 'Display <b>line item taxes</b> inline',
 
+  'iframe_url' => 'Website',
+  'iframe_url_help1' => 'Copy the following code to a page on your site.',
+  'iframe_url_help2' => 'You can test the feature by clicking \'View as recipient\' for an invoice.',
+
+  'auto_bill' => 'Auto Bill',
+  'military_time' => '24 Hour Time',
+  'last_sent' => 'Last Sent',
+
+  'reminder_emails' => 'Reminder Emails',
+  'templates_and_reminders' => 'Templates & Reminders',
+  'subject' => 'Subject',
+  'body' => 'Body',
+  'first_reminder' => 'First Reminder',
+  'second_reminder' => 'Second Reminder',
+  'third_reminder' => 'Third Reminder',
+  'num_days_reminder' => 'Days after due date',
+  'reminder_subject' => 'Reminder: Invoice :invoice from :account',
+  'reset' => 'Reset',
+  'invoice_not_found' => 'The requested invoice is not available',
+
+  'referral_program' => 'Referral Program',
+  'referral_code' => 'Referral Code',
+  'last_sent_on' => 'Last sent on :date',
   
 );

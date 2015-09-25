@@ -43,6 +43,7 @@ Route::post('get_started', 'AccountController@getStarted');
 
 // Client visible pages
 Route::get('view/{invitation_key}', 'InvoiceController@view');
+Route::get('view', 'HomeController@viewLogo');
 Route::get('approve/{invitation_key}', 'QuoteController@approve');
 Route::get('payment/{invitation_key}/{payment_type?}', 'PaymentController@show_payment');
 Route::post('payment/{invitation_key}', 'PaymentController@do_payment');
@@ -182,9 +183,14 @@ Route::group(['middleware' => 'api', 'prefix' => 'api/v1'], function()
 {
     Route::resource('ping', 'ClientApiController@ping');
     Route::resource('clients', 'ClientApiController');
-    Route::resource('invoices', 'InvoiceApiController');
+    Route::get('quotes/{client_id?}', 'QuoteApiController@index');
     Route::resource('quotes', 'QuoteApiController');
+    Route::get('invoices/{client_id?}', 'InvoiceApiController@index');
+    Route::resource('invoices', 'InvoiceApiController');
+    Route::get('payments/{client_id?}', 'PaymentApiController@index');
     Route::resource('payments', 'PaymentApiController');
+    Route::get('tasks/{client_id?}', 'TaskApiController@index');
+    Route::resource('tasks', 'TaskApiController');
     Route::post('hooks', 'IntegrationController@subscribe');
     Route::post('email_invoice', 'InvoiceApiController@emailInvoice');
 });
@@ -217,7 +223,6 @@ Route::get('/compare-online-invoicing{sites?}', function() {
 Route::get('/forgot_password', function() {
     return Redirect::to(NINJA_APP_URL.'/forgot', 301);
 });
-
 
 if (!defined('CONTACT_EMAIL')) {
     define('CONTACT_EMAIL', Config::get('mail.from.address'));
@@ -253,7 +258,7 @@ if (!defined('CONTACT_EMAIL')) {
     define('ACCOUNT_CHART_BUILDER', 'chart_builder');
     define('ACCOUNT_USER_MANAGEMENT', 'user_management');
     define('ACCOUNT_DATA_VISUALIZATIONS', 'data_visualizations');
-    define('ACCOUNT_EMAIL_TEMPLATES', 'email_templates');
+    define('ACCOUNT_TEMPLATES_AND_REMINDERS', 'templates_and_reminders');
     define('ACCOUNT_TOKEN_MANAGEMENT', 'token_management');
     define('ACCOUNT_CUSTOMIZE_DESIGN', 'customize_design');
 
@@ -301,6 +306,7 @@ if (!defined('CONTACT_EMAIL')) {
     define('MAX_NUM_CLIENTS_PRO', 20000);
     define('MAX_NUM_USERS', 20);
     define('MAX_SUBDOMAIN_LENGTH', 30);
+    define('MAX_IFRAME_URL_LENGTH', 250);
     define('DEFAULT_FONT_SIZE', 9);
 
     define('INVOICE_STATUS_DRAFT', 1);
@@ -328,6 +334,7 @@ if (!defined('CONTACT_EMAIL')) {
     define('SESSION_COUNTER', 'sessionCounter');
     define('SESSION_LOCALE', 'sessionLocale');
     define('SESSION_USER_ACCOUNTS', 'userAccounts');
+    define('SESSION_REFERRAL_CODE', 'referralCode');
 
     define('SESSION_LAST_REQUEST_PAGE', 'SESSION_LAST_REQUEST_PAGE');
     define('SESSION_LAST_REQUEST_TIME', 'SESSION_LAST_REQUEST_TIME');
@@ -350,6 +357,7 @@ if (!defined('CONTACT_EMAIL')) {
     define('PAYMENT_LIBRARY_PHP_PAYMENTS', 2);
 
     define('GATEWAY_AUTHORIZE_NET', 1);
+    define('GATEWAY_EWAY', 4);
     define('GATEWAY_AUTHORIZE_NET_SIM', 2);
     define('GATEWAY_PAYPAL_EXPRESS', 17);
     define('GATEWAY_PAYPAL_PRO', 18);
@@ -371,10 +379,10 @@ if (!defined('CONTACT_EMAIL')) {
     define('PREV_USER_ID', 'PREV_USER_ID');
     define('NINJA_ACCOUNT_KEY', 'zg4ylmzDkdkPOT8yoKQw9LTWaoZJx79h');
     define('NINJA_GATEWAY_ID', GATEWAY_STRIPE);
-    define('NINJA_GATEWAY_CONFIG', '');
+    define('NINJA_GATEWAY_CONFIG', 'NINJA_GATEWAY_CONFIG');
     define('NINJA_WEB_URL', 'https://www.invoiceninja.com');
     define('NINJA_APP_URL', 'https://app.invoiceninja.com');
-    define('NINJA_VERSION', '2.3.4');
+    define('NINJA_VERSION', '2.4.0');
     define('NINJA_DATE', '2000-01-01');
 
     define('NINJA_FROM_EMAIL', 'maildelivery@invoiceninja.com');
@@ -382,6 +390,9 @@ if (!defined('CONTACT_EMAIL')) {
     define('ZAPIER_URL', 'https://zapier.com/developer/invite/11276/85cf0ee4beae8e802c6c579eb4e351f1/');
     define('OUTDATE_BROWSER_URL', 'http://browsehappy.com/');
     define('PDFMAKE_DOCS', 'http://pdfmake.org/playground.html');
+    define('PHANTOMJS_CLOUD', 'http://api.phantomjscloud.com/single/browser/v1/');
+    define('GITHUB_RELEASES', 'https://github.com/hillelcoren/invoice-ninja/releases');
+    define('REFERRAL_PROGRAM_URL', false);
 
     define('COUNT_FREE_DESIGNS', 4);
     define('COUNT_FREE_DESIGNS_SELF_HOST', 5); // include the custom design
@@ -416,6 +427,10 @@ if (!defined('CONTACT_EMAIL')) {
     define('PAYMENT_TYPE_TOKEN', 'PAYMENT_TYPE_TOKEN');
     define('PAYMENT_TYPE_ANY', 'PAYMENT_TYPE_ANY');
 
+    define('REMINDER1', 'reminder1');
+    define('REMINDER2', 'reminder2');
+    define('REMINDER3', 'reminder3');
+
     $creditCards = [
                 1 => ['card' => 'images/credit_cards/Test-Visa-Icon.png', 'text' => 'Visa'],
                 2 => ['card' => 'images/credit_cards/Test-MasterCard-Icon.png', 'text' => 'Master Card'],
@@ -446,7 +461,6 @@ if (!defined('CONTACT_EMAIL')) {
     }
 }
 
-/*
 // Log all SQL queries to laravel.log
 Event::listen('illuminate.query', function($query, $bindings, $time, $name)
 {
@@ -471,7 +485,7 @@ Event::listen('illuminate.query', function($query, $bindings, $time, $name)
 
     Log::info($query, $data);
 });
-*/
+
 
 /*
 if (Auth::check() && Auth::user()->id === 1)
@@ -479,3 +493,4 @@ if (Auth::check() && Auth::user()->id === 1)
   Auth::loginUsingId(1);
 }
 */
+

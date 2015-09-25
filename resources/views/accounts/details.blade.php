@@ -17,6 +17,7 @@
 	)) !!}
 
 	{{ Former::populate($account) }}
+    {{ Former::populateField('military_time', intval($account->military_time)) }}
 	@if ($showUser)
 		{{ Former::populateField('first_name', $primaryUser->first_name) }}
 		{{ Former::populateField('last_name', $primaryUser->last_name) }}
@@ -37,12 +38,6 @@
             <div class="panel-body">
 			
 			{!! Former::text('name') !!}
-
-            @if (Auth::user()->isPro() && Utils::isNinja())
-                {{ Former::setOption('capitalize_translations', false) }}
-                {!! Former::text('subdomain')->placeholder('texts.www')->onchange('onSubdomainChange()') !!}                
-            @endif            
-
             {!! Former::text('id_number') !!}
             {!! Former::text('vat_number') !!}
 			{!! Former::text('work_email') !!}
@@ -91,14 +86,25 @@
 				{!! Former::text('last_name') !!}
                 {!! Former::text('email') !!}
 				{!! Former::text('phone') !!}
-                @if (Utils::isNinjaDev())
-                    {!! Former::checkbox('dark_mode')->text(trans('texts.dark_mode_help')) !!}
+                @if (Utils::isNinja() && $primaryUser->confirmed)
+                    @if ($primaryUser->referral_code)
+                        {!! Former::plaintext('referral_code')
+                                ->value($primaryUser->referral_code . ' <a href="'.REFERRAL_PROGRAM_URL.'" target="_blank" title="'.trans('texts.learn_more').'">' . Icon::create('question-sign') . '</a>') !!}
+                    @else
+                        {!! Former::checkbox('referral_code')
+                                ->text(trans('texts.enable') . ' <a href="'.REFERRAL_PROGRAM_URL.'" target="_blank" title="'.trans('texts.learn_more').'">' . Icon::create('question-sign') . '</a>')  !!}
+                    @endif                    
                 @endif
+                @if (false && Utils::isNinjaDev())
+                    {!! Former::checkbox('dark_mode')->text(trans('texts.dark_mode_help')) !!}
+                @endif                
                 
-                @if (Auth::user()->confirmed)                
-                    {!! Former::actions( Button::primary(trans('texts.change_password'))->small()->withAttributes(['onclick'=>'showChangePassword()'])) !!}
-                @elseif (Auth::user()->registered)
-                    {!! Former::actions( Button::primary(trans('texts.resend_confirmation'))->asLinkTo(URL::to('/resend_confirmation'))->small() ) !!}
+                @if (Utils::isNinja())
+                    @if (Auth::user()->confirmed)                
+                        {!! Former::actions( Button::primary(trans('texts.change_password'))->small()->withAttributes(['onclick'=>'showChangePassword()'])) !!}
+                    @elseif (Auth::user()->registered)
+                        {!! Former::actions( Button::primary(trans('texts.resend_confirmation'))->asLinkTo(URL::to('/resend_confirmation'))->small() ) !!}
+                    @endif
                 @endif
                 </div>
             </div>
@@ -111,16 +117,18 @@
           </div>
             <div class="panel-body">
 
-			{!! Former::select('language_id')->addOption('','')
-				->fromQuery($languages, 'name', 'id') !!}			
 			{!! Former::select('currency_id')->addOption('','')
 				->fromQuery($currencies, 'name', 'id') !!}			
+            {!! Former::select('language_id')->addOption('','')
+                ->fromQuery($languages, 'name', 'id') !!}           
 			{!! Former::select('timezone_id')->addOption('','')
 				->fromQuery($timezones, 'location', 'id') !!}
 			{!! Former::select('date_format_id')->addOption('','')
 				->fromQuery($dateFormats, 'label', 'id') !!}
 			{!! Former::select('datetime_format_id')->addOption('','')
 				->fromQuery($datetimeFormats, 'label', 'id') !!}
+            {!! Former::checkbox('military_time')->text(trans('texts.enable')) !!}
+
             </div>
         </div>
 		</div>
@@ -286,15 +294,6 @@
               }
             });     
         }
-
-        function onSubdomainChange() {
-            var input = $('#subdomain');
-            var val = input.val();
-            if (!val) return;
-            val = val.replace(/[^a-zA-Z0-9_\-]/g, '').toLowerCase().substring(0, {{ MAX_SUBDOMAIN_LENGTH }});
-            input.val(val);
-        }
-
 	</script>
 
 @stop

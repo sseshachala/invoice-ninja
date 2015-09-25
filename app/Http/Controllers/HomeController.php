@@ -40,6 +40,11 @@ class HomeController extends BaseController
     {
         return View::make('public.terms', ['hideHeader' => true]);
     }
+
+    public function viewLogo()
+    {
+        return View::make('public.logo');
+    }
     
     public function invoiceNow()
     {
@@ -49,11 +54,18 @@ class HomeController extends BaseController
             Auth::logout();
         }
 
+        // Track the referral/campaign code
+        foreach (['rc', 'utm_campaign'] as $code) {
+            if (Input::has($code)) {
+                Session::set(SESSION_REFERRAL_CODE, Input::get($code));
+            }
+        }
+
         if (Auth::check()) {
             $redirectTo = Input::get('redirect_to', 'invoices/create');
             return Redirect::to($redirectTo)->with('sign_up', Input::get('sign_up'));
         } else {
-            return View::make('public.header', ['invoiceNow' => true]);
+            return View::make('public.invoice_now');
         }
     }
 

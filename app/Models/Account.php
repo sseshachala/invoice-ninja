@@ -16,7 +16,7 @@ class Account extends Eloquent
 
     /*
     protected $casts = [
-        'hide_quantity' => 'boolean',
+        'invoice_settings' => 'object',
     ];
     */
     
@@ -111,6 +111,17 @@ class Account extends Eloquent
         $user = $this->users()->first();
 
         return $user->getDisplayName();
+    }
+
+    public function getMomentDateTimeFormat()
+    {
+        $format = $this->datetime_format ? $this->datetime_format->format_moment : DEFAULT_DATETIME_MOMENT_FORMAT;
+
+        if ($this->military_time) {
+            $format = str_replace('h:mm:ss a', 'H:mm:ss', $format);
+        }
+
+        return $format;
     }
 
     public function getTimezone()
@@ -228,18 +239,27 @@ class Account extends Eloquent
         return $language->locale;
     }
 
-    public function loadLocalizationSettings()
+    public function loadLocalizationSettings($client = false)
     {
         $this->load('timezone', 'date_format', 'datetime_format', 'language');
 
         Session::put(SESSION_TIMEZONE, $this->timezone ? $this->timezone->name : DEFAULT_TIMEZONE);
         Session::put(SESSION_DATE_FORMAT, $this->date_format ? $this->date_format->format : DEFAULT_DATE_FORMAT);
         Session::put(SESSION_DATE_PICKER_FORMAT, $this->date_format ? $this->date_format->picker_format : DEFAULT_DATE_PICKER_FORMAT);
-        Session::put(SESSION_DATETIME_FORMAT, $this->datetime_format ? $this->datetime_format->format : DEFAULT_DATETIME_FORMAT);
-        Session::put(SESSION_CURRENCY, $this->currency_id ? $this->currency_id : DEFAULT_CURRENCY);
-        Session::put(SESSION_LOCALE, $this->language_id ? $this->language->locale : DEFAULT_LOCALE);
 
-        App::setLocale(session(SESSION_LOCALE));
+        $currencyId = ($client && $client->currency_id) ? $client->currency_id : $this->currency_id ?: DEFAULT_CURRENCY; 
+        $locale = ($client && $client->language_id) ? $client->language->locale : ($this->language_id ? $this->Language->locale : DEFAULT_LOCALE); 
+
+        Session::put(SESSION_CURRENCY, $currencyId);
+        Session::put(SESSION_LOCALE, $locale);
+
+        App::setLocale($locale);
+
+        $format = $this->datetime_format ? $this->datetime_format->format : DEFAULT_DATETIME_FORMAT;
+        if ($this->military_time) {
+            $format = str_replace('g:i a', 'H:i', $format);
+        }
+        Session::put(SESSION_DATETIME_FORMAT, $format);
     }
 
     public function getInvoiceLabels()
@@ -282,6 +302,7 @@ class Account extends Eloquent
             'invoice_to',
             'details',
             'invoice_no',
+            'valid_until',
         ];
 
         foreach ($fields as $field) {
@@ -384,21 +405,36 @@ class Account extends Eloquent
         return $this;
     }
 
-    public function getEmailTemplate($entityType, $message = false)
+    public function getDefaultEmailSubject($entityType)
     {
-        $field = "email_template_$entityType";
-        $template = $this->$field;
+        if (strpos($entityType, 'reminder') !== false) {
+            $entityType = 'reminder';
+        }
 
-        if ($template) {
-            return $template;
+        return trans("texts.{$entityType}_subject", ['invoice' => '$invoice', 'account' => '$account']);
+    }
+
+    public function getEmailSubject($entityType)
+    {
+        $field = "email_subject_{$entityType}";
+        $value = $this->$field;
+
+        if ($value) {
+            return $value;
+        }
+
+        return $this->getDefaultEmailSubject($entityType);
+    }
+
+    public function getDefaultEmailTemplate($entityType, $message = false)
+    {
+        if (strpos($entityType, 'reminder') >= 0) {
+            $entityType = ENTITY_INVOICE;
         }
 
         $template = "\$client,<p/>\r\n\r\n" .
-                    trans("texts.{$entityType}_message", ['amount' => '$amount']) . "<p/>\r\n\r\n";
-
-        if ($entityType != ENTITY_PAYMENT) {
-            $template .= "<a href=\"\$link\">\$link</a><p/>\r\n\r\n";
-        }
+                    trans("texts.{$entityType}_message", ['amount' => '$amount']) . "<p/>\r\n\r\n" .
+                    "<a href=\"\$link\">\$link</a><p/>\r\n\r\n";
 
         if ($message) {
             $template .= "$message<p/>\r\n\r\n";
@@ -407,13 +443,25 @@ class Account extends Eloquent
         return $template . "\$footer";
     }
 
+    public function getEmailTemplate($entityType, $message = false)
+    {
+        $field = "email_template_{$entityType}";
+        $template = $this->$field;
+
+        if ($template) {
+            return $template;
+        }
+
+        return $this->getDefaultEmailTemplate($entityType, $message);
+    }
+
     public function getEmailFooter()
     {
         if ($this->email_footer) {
             // Add line breaks if HTML isn't already being used
-            return strip_tags($this->email_footer) == $this->email_footer ? nl2br($this->email_footer) : $this->email_footer;            
+            return strip_tags($this->email_footer) == $this->email_footer ? nl2br($this->email_footer) : $this->email_footer;
         } else {
-            return "<p>" . trans('texts.email_signature') . "<br>\$account</p>";
+            return "<p>" . trans('texts.email_signature') . "\n<br>\$account</p>";
         }
     }
 
@@ -430,6 +478,20 @@ class Account extends Eloquent
     public function selectTokenCheckbox()
     {
         return $this->token_billing_type_id == TOKEN_BILLING_OPT_OUT;
+    }
+
+    public function getSiteUrl()
+    {
+        $url = SITE_URL;
+        $iframe_url = $this->iframe_url;
+                
+        if ($iframe_url) {
+            return "{$iframe_url}/?";
+        } else if ($this->subdomain) {
+            $url = Utils::replaceSubdomain($url, $this->subdomain);
+        }
+
+        return $url;
     }
 }
 

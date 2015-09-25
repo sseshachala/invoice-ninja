@@ -133,7 +133,7 @@ class TaskController extends BaseController
             'url' => 'tasks',
             'title' => trans('texts.new_task'),
             'timezone' => Auth::user()->account->timezone ? Auth::user()->account->timezone->name : DEFAULT_TIMEZONE,
-            'datetimeFormat' => Auth::user()->account->datetime_format ? Auth::user()->account->datetime_format->format_moment : DEFAULT_DATETIME_MOMENT_FORMAT
+            'datetimeFormat' => Auth::user()->account->getMomentDateTimeFormat(),
         ];
 
         $data = array_merge($data, self::getViewModel());
@@ -155,7 +155,7 @@ class TaskController extends BaseController
         if ($task->invoice) {
             $actions[] = ['url' => URL::to("inovices/{$task->invoice->public_id}/edit"), 'label' => trans("texts.view_invoice")];
         } else {
-            $actions[] = ['url' => 'javascript:submitAction("invoice")', 'label' => trans("texts.create_invoice")];
+            $actions[] = ['url' => 'javascript:submitAction("invoice")', 'label' => trans("texts.invoice_task")];
 
             // check for any open invoices
             $invoices = $task->client_id ? $this->invoiceRepo->findOpenInvoices($task->client_id) : [];
@@ -182,7 +182,7 @@ class TaskController extends BaseController
             'duration' => $task->is_running ? $task->getCurrentDuration() : $task->getDuration(),
             'actions' => $actions,
             'timezone' => Auth::user()->account->timezone ? Auth::user()->account->timezone->name : DEFAULT_TIMEZONE,
-            'datetimeFormat' => Auth::user()->account->datetime_format ? Auth::user()->account->datetime_format->format_moment : DEFAULT_DATETIME_MOMENT_FORMAT
+            'datetimeFormat' => Auth::user()->account->getMomentDateTimeFormat(),
         ];
 
         $data = array_merge($data, self::getViewModel());
@@ -214,6 +214,14 @@ class TaskController extends BaseController
 
         if (in_array($action, ['archive', 'delete', 'invoice', 'restore', 'add_to_invoice'])) {
             return self::bulk();
+        }
+
+        if ($validator = $this->taskRepo->getErrors(Input::all())) {
+            $url = $publicId ? 'tasks/'.$publicId.'/edit' : 'tasks/create';
+            Session::flash('error', trans('texts.task_errors'));
+            return Redirect::to($url)
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $task = $this->taskRepo->save($publicId, Input::all());

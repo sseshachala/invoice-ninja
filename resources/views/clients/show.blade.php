@@ -99,6 +99,10 @@
 		  	   <p>{!! $client->getWebsite() !!}</p>
             @endif
 
+            @if ($client->language)
+                <p><i class="fa fa-language" style="width: 20px"></i>{{ $client->language->name }}</p>
+            @endif
+
 		  	<p>{{ $client->payment_terms ? trans('texts.payment_terms') . ": Net " . $client->payment_terms : '' }}</p>
 		</div>
 
@@ -200,7 +204,7 @@
 	    			trans('texts.quote_number'),
 	    			trans('texts.quote_date'),
 	    			trans('texts.total'),
-	    			trans('texts.due_date'),
+	    			trans('texts.valid_until'),
 	    			trans('texts.status'))
 		    	->setUrl(url('api/quotes/'. $client->public_id))
 		    	->setOptions('sPaginationType', 'bootstrap')

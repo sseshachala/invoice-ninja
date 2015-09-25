@@ -524,17 +524,25 @@ if (window.ko) {
   };
 }
 
+function getContactDisplayName(contact)
+{
+    var str = '';
+    if (contact.first_name || contact.last_name) {
+        str += contact.first_name + ' ' + contact.last_name;
+    }
+    if (str && contact.email) {
+        str += ' - ';
+    }
+    return str + contact.email;
+}
+
 function getClientDisplayName(client)
 {
   var contact = client.contacts ? client.contacts[0] : false;
   if (client.name) {
     return client.name;
   } else if (contact) {
-    if (contact.first_name || contact.last_name) {
-      return contact.first_name + ' ' + contact.last_name;
-    } else {
-      return contact.email;
-    }
+    return getContactDisplayName(contact);
   }
   return '';
 }
@@ -805,6 +813,21 @@ function displaySubtotals(doc, layout, invoice, y, rightAlignTitleX)
   };
 
   return displayGrid(doc, invoice, data, 300, y, layout, options) + 10;
+}
+
+function formatAddress(city, state, zip, swap) {
+    var str = '';
+    if (swap) {
+        str += zip ? zip + ' ' : '';
+        str += city ? city : '';
+        str += (city && state) ? ', ' : (city ? ' ' : '');
+        str += state;        
+    } else {
+        str += city ? city : '';
+        str += (city && state) ? ', ' : (state ? ' ' : '');
+        str += state + ' ' + zip;
+    }
+    return str;
 }
 
 function concatStrings() {
@@ -1645,3 +1668,11 @@ function doubleDollarSign(str) {
     if (!str) return '';
     return str.replace(/\$/g, '\$\$\$');
 }
+
+function truncate(string, length){
+   if (string.length > length) {
+      return string.substring(0, length) + '...';
+   } else {
+      return string;
+   }
+};

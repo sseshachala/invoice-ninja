@@ -185,7 +185,7 @@ return array(
   'users' => 'Utilisateurs',
   'localization' => 'Localisation',
   'remove_logo' => 'Supprimer le logo',
-  'logo_help' => 'Formats supportés: JPEG, GIF et PNG. Hauteur recommandé: 120px',
+  'logo_help' => 'Formats supportés: JPEG, GIF et PNG',
   'payment_gateway' => 'Passerelle de paiement',
   'gateway_id' => 'Fournisseur',
   'email_notifications' => 'Notifications par courriel',
@@ -744,8 +744,44 @@ return array(
   'customize_help' => '<p>Nous utilisons <a href="http://pdfmake.org/" target="_blank">pdfmake</a> pour définir le design des factures. Le <a href="http://pdfmake.org/playground.html" target="_blank">bac à sable<a> de pdfmake est une bonne façon de voir cette bibliothèque en action.</p>
                         <p>Vous pouvez accéder à n\'importe quel champ de facture en ajoutant <code>Value</code> à la fin. Par exemple <code>$invoiceNumberValue</code> affiche le numéro de facture.</p>
                         <p>Pour accéder à une propriété héritée avec la  notation par point. Par exemple pour montrer le nom du client vous pouvez utiliser <code>$client.nameValue</code>.</p>
-                        <p>Si vous avez besoin d\'aide pour comprendre quelque chose envoyez une question à notre <a href="https://www.invoiceninja.com/forums/forum/support/" target="_blank">forum de support</a>.</p>'
+                        <p>Si vous avez besoin d\'aide pour comprendre quelque chose envoyez une question à notre <a href="https://www.invoiceninja.com/forums/forum/support/" target="_blank">forum de support</a>.</p>',
+
+  'invoice_due_date' => 'Due Date',
+  'quote_due_date' => 'Valid Until',
+  'valid_until' => 'Valid Until',
+  'reset_terms' => 'Reset terms',
+  'reset_footer' => 'Reset footer',
+  'invoices_sent' => ':count invoice sent|:count invoices sent',
+  'status_draft' => 'Draft',
+  'status_sent' => 'Sent',
+  'status_viewed' => 'Viewed',
+  'status_partial' => 'Partial',
+  'status_paid' => 'Paid',
+  'show_line_item_tax' => 'Display <b>line item taxes</b> inline',
+
+  'iframe_url' => 'Website',
+  'iframe_url_help1' => 'Copy the following code to a page on your site.',
+  'iframe_url_help2' => 'You can test the feature by clicking \'View as recipient\' for an invoice.',
+
+  'auto_bill' => 'Auto Bill',
+  'military_time' => '24 Hour Time',
+  'last_sent' => 'Last Sent',
+
+  'reminder_emails' => 'Reminder Emails',
+  'templates_and_reminders' => 'Templates & Reminders',
+  'subject' => 'Subject',
+  'body' => 'Body',
+  'first_reminder' => 'First Reminder',
+  'second_reminder' => 'Second Reminder',
+  'third_reminder' => 'Third Reminder',
+  'num_days_reminder' => 'Days after due date',
+  'reminder_subject' => 'Reminder: Invoice :invoice from :account',
+  'reset' => 'Reset',
+  'invoice_not_found' => 'The requested invoice is not available',
   
+  'referral_program' => 'Referral Program',
+  'referral_code' => 'Referral Code',
+  'last_sent_on' => 'Last sent on :date',
 
 
 );
