@@ -29,19 +29,21 @@ class HandleUserSettingsChanged {
 	 */
 	public function handle(UserSettingsChanged $event)
 	{
-        if (!Auth::check()) {
-            return;
-        }
+		if (!Auth::check()) {
+			return;
+		}
 
+        $account = Auth::user()->account;
         $account = Auth::user()->account;
         $account->loadLocalizationSettings();
 
-        $users = $this->accountRepo->loadAccounts(Auth::user()->id);
-        Session::put(SESSION_USER_ACCOUNTS, $users);
+		if ($event->user && $event->user->isEmailBeingChanged()) {
+			$this->userMailer->sendConfirmation($event->user);
+			Session::flash('warning', trans('texts.verify_email'));
+		}
 
-        if ($event->user && $event->user->isEmailBeingChanged()) {
-            $this->userMailer->sendConfirmation($event->user);
-            Session::flash('warning', trans('texts.verify_email'));
+//            $users = $this->accountRepo->loadAccounts(Auth::user()->id);
+//            Session::put(SESSION_USER_ACCOUNTS, $users);
         }
 	}
 
