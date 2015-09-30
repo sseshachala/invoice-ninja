@@ -95,8 +95,8 @@ class StartupCheck
                 }
             }
         } elseif (Auth::check()) {
-            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
-            App::setLocale($locale);
+//            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
+//            App::setLocale($locale);
         }
 
         // Make sure the account/user localization settings are in the session

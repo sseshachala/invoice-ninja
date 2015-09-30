@@ -82,6 +82,8 @@ get('/password/reset/{token}', array('as' => 'forgot', 'uses' => 'Auth\PasswordC
 post('/password/reset', array('as' => 'forgot', 'uses' => 'Auth\PasswordController@postReset'));
 get('/user/confirm/{code}', 'UserController@confirm');
 
+get('/autologin', ['as' => 'autologin', 'uses' => 'Auth\AutoLoginController@login']);
+
 
 if (Utils::isNinja()) {
     Route::post('/signup/register', 'AccountController@doRegister');
