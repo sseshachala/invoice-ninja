@@ -88,6 +88,8 @@ Route::post('/client/forgot', array('as' => 'forgot', 'uses' => 'ClientAuth\Pass
 Route::get('/client/password/reset/{invitation_key}/{token}', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@getReset'));
 Route::post('/client/password/reset', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@postReset'));
 
+get('/autologin', ['as' => 'autologin', 'uses' => 'Auth\AutoLoginController@login']);
+
 
 if (Utils::isNinja()) {
     Route::post('/signup/register', 'AccountController@doRegister');

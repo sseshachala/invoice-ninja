@@ -64,16 +64,28 @@ return [
             'strict'    => env('DB_STRICT', false),
         ],
 
-        'pgsql' => [
-            'driver'   => 'pgsql',
-            'host'     => env('DB_HOST', 'localhost'),
-            'database' => env('DB_DATABASE', 'forge'),
-            'username' => env('DB_USERNAME', 'forge'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset'  => 'utf8',
-            'prefix'   => '',
-            'schema'   => 'public',
-        ],
+		'mysql-b2b' => [
+			'driver'    => 'mysql',
+			'host'      => env('B2B_HOST', 'localhost'),
+			'database'  => env('B2B_DATABASE', 'forge'),
+			'username'  => env('B2B_USERNAME', 'forge'),
+			'password'  => env('B2B_PASSWORD', ''),
+			'charset'   => 'utf8',
+			'collation' => 'utf8_unicode_ci',
+			'prefix'    => 'b2b_',
+			'strict'    => false,
+		],
+
+		'pgsql' => [
+			'driver'   => 'pgsql',
+			'host'     => env('DB_HOST', 'localhost'),
+			'database' => env('DB_DATABASE', 'forge'),
+			'username' => env('DB_USERNAME', 'forge'),
+			'password' => env('DB_PASSWORD', ''),
+			'charset'  => 'utf8',
+			'prefix'   => '',
+			'schema'   => 'public',
+		],
 
         'sqlsrv' => [
             'driver'   => 'sqlsrv',

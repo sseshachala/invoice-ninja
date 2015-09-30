@@ -106,8 +106,10 @@ class StartupCheck
                 }
             }
         } elseif (Auth::check()) {
-            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
-            App::setLocale($locale);
+//            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
+//            App::setLocale($locale);
+//            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
+//            App::setLocale($locale);
         } elseif (session(SESSION_LOCALE)) {
             App::setLocale(session(SESSION_LOCALE));
         }
