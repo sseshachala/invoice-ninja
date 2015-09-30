@@ -29,10 +29,10 @@ class HandleUserSettingsChanged {
 	{
         if (Auth::check()) {
             $account = Auth::user()->account;
-            $account->loadLocalizationSettings();
+//            $account->loadLocalizationSettings();
 
-            $users = $this->accountRepo->loadAccounts(Auth::user()->id);
-            Session::put(SESSION_USER_ACCOUNTS, $users);
+//            $users = $this->accountRepo->loadAccounts(Auth::user()->id);
+//            Session::put(SESSION_USER_ACCOUNTS, $users);
         }
 	}
 
