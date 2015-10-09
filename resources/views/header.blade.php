@@ -123,6 +123,8 @@
       success: function(result) { 
         if (result) {
           localStorage.setItem('guest_key', '');
+          fbq('track', 'CompleteRegistration');
+          window._fbq.push(['track', '{{ env('FACEBOOK_PIXEL_SIGN_UP') }}', {'value':'0.00','currency':'USD'}]);
           trackEvent('/account', '/signed_up');
           NINJA.isRegistered = true;
           $('#signUpButton').hide();
@@ -164,6 +166,7 @@
   NINJA.proPlanFeature = '';
   function showProPlan(feature) {
     $('#proPlanModal').modal('show');
+    fbq('track', 'InitiateCheckout');
     trackEvent('/account', '/show_pro_plan/' + feature);
     NINJA.proPlanFeature = feature;
   }
@@ -178,6 +181,7 @@
 
   @if (Auth::check() && !Auth::user()->isPro())
   function submitProPlan() {
+    fbq('track', 'AddPaymentInfo');
     trackEvent('/account', '/submit_pro_plan/' + NINJA.proPlanFeature);
     if (NINJA.isRegistered) {      
       $.ajax({
@@ -235,21 +239,9 @@
     @endif
   }
 
-
-  // keep the token cookie valid to prevent token mismatch errors
-  function keepAlive() {
+  $(function() {
     window.setTimeout(function() { 
-        $.get('{{ URL::to('/keep_alive') }}', function(data) {
-            keepAlive();
-        })
-    }, 1000 * 60 * 60);
-  }      
-
-  $(function() {    
-    keepAlive();    
-
-    window.setTimeout(function() { 
-        $(".alert-hide").fadeOut(500);
+        $(".alert-hide").fadeOut();
     }, 3000);
 
     $('#search').blur(function(){
@@ -478,10 +470,10 @@
   </div>
 </nav>
 
-
-
 <br/>
-<div class="container">		
+<div class="container">
+  
+  @include('partials.warn_session', ['redirectTo' => '/dashboard'])
 
   @if (Session::has('warning'))
   <div class="alert alert-warning">{!! Session::get('warning') !!}</div>
@@ -499,11 +491,11 @@
   @endif
 
   @if (Session::has('error'))
-  <div class="alert alert-danger">{!! Session::get('error') !!}</div>
+      <div class="alert alert-danger">{!! Session::get('error') !!}</div>
   @endif
 
   @if (!isset($showBreadcrumbs) || $showBreadcrumbs)
-  {!! HTML::breadcrumbs() !!}
+    {!! HTML::breadcrumbs() !!}
   @endif
 
   @yield('content')		

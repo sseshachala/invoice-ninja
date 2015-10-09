@@ -691,21 +691,17 @@
             while($(this).outerHeight() < this.scrollHeight + parseFloat($(this).css("borderTopWidth")) + parseFloat($(this).css("borderBottomWidth"))) {
                 $(this).height($(this).height()+1);
             };
-        });        
+        });
 
 		@if (Auth::user()->account->fill_products)
-			$('.datalist').on('input', function() {			                
+			$('.datalist').on('input', function() {
 				var key = $(this).val();
 				for (var i=0; i<products.length; i++) {
 					var product = products[i];
 					if (product.product_key == key) {
-						var model = ko.dataFor(this);					
-                        if (!model.notes()) {
-						  model.notes(product.notes);
-                        }
-                        if (!model.cost()) {
-						  model.cost(accounting.toFixed(product.cost,2));
-                        }
+						var model = ko.dataFor(this);
+                        model.notes(product.notes);
+                        model.cost(accounting.toFixed(product.cost,2));
                         if (!model.qty()) {
 						  model.qty(1);
                         }
@@ -797,6 +793,11 @@
 	}
 
 	function onEmailClick() {
+        if (!isEmailValid()) {
+            alert("{!! trans('texts.provide_email') !!}");
+            return;
+        }
+
         if (!NINJA.isRegistered) {
             alert("{!! trans('texts.registration_required') !!}");
             return;
@@ -870,7 +871,7 @@
 	function isEmailValid() {
 		var isValid = false;
 		var sendTo = false;
-		var client = self.invoice().client();
+		var client = model.invoice().client();
 		for (var i=0; i<client.contacts().length; i++) {
 			var contact = client.contacts()[i];        		
 			if (isValidEmailAddress(contact.email())) {
@@ -1175,12 +1176,12 @@
 		self.is_amount_discount = ko.observable(0);
 		self.frequency_id = ko.observable(4); // default to monthly 
         self.terms = ko.observable('');
-        self.default_terms = ko.observable("{{ str_replace(["\r\n","\r","\n"], '\n', addslashes($account->invoice_terms)) }}");
-        self.terms_placeholder = ko.observable({{ !$invoice && $account->invoice_terms ? 'true' : 'false' }} ? self.default_terms() : '');
+        self.default_terms = ko.observable(account.invoice_terms);
+        self.terms_placeholder = ko.observable({{ !$invoice && $account->invoice_terms ? 'account.invoice_terms' : false}});
         self.set_default_terms = ko.observable(false);
         self.invoice_footer = ko.observable('');
-        self.default_footer = ko.observable("{{ str_replace(["\r\n","\r","\n"], '\n', addslashes($account->invoice_footer)) }}");
-        self.footer_placeholder = ko.observable({{ !$invoice && $account->invoice_footer ? 'true' : 'false' }} ? self.default_footer() : '');
+        self.default_footer = ko.observable(account.invoice_footer);
+        self.footer_placeholder = ko.observable({{ !$invoice && $account->invoice_footer ? 'account.invoice_footer' : false}});
         self.set_default_footer = ko.observable(false);
 		self.public_notes = ko.observable('');		
 		self.po_number = ko.observable('');
@@ -1741,23 +1742,22 @@
 			} else {
 				return total ? formatMoney(total, 1) : '';
 			}
-  	});
+      	});
 
-  	this.hideActions = function() {
-		this.actionsVisible(false);
-  	}
+        this.hideActions = function() {
+            this.actionsVisible(false);
+        }
 
-  	this.showActions = function() {
-		this.actionsVisible(true);
-  	}
+        this.showActions = function() {
+            this.actionsVisible(true);
+        }
 
-  	this.isEmpty = function() {
-  		return !self.product_key() && !self.notes() && !self.cost() && (!self.qty() || {{ $account->hide_quantity ? 'true' : 'false' }});
-  	}
+        this.isEmpty = function() {
+            return !self.product_key() && !self.notes() && !self.cost() && (!self.qty() || {{ $account->hide_quantity ? 'true' : 'false' }});
+        }
 
-  	this.onSelect = function(){              
+        this.onSelect = function() {}
     }
-	}
 
 	function onItemChange()
 	{
@@ -1772,12 +1772,6 @@
 		if (!hasEmpty) {
 			model.invoice().addItem();
 		}
-
-        /*
-		$('.word-wrap').each(function(index, input) {
-			$(input).height($(input).val().split('\n').length * 20);
-		});
-        */
 	}
 
 	function onTaxRateChange()
@@ -1824,6 +1818,7 @@
 	var products = {!! $products !!};
 	var clients = {!! $clients !!};	
 	var countries = {!! $countries !!};
+    var account = {!! Auth::user()->account !!};
 
 	var clientMap = {};
 	var $clientSelect = $('select#client');

@@ -655,6 +655,10 @@ class InvoiceRepository
             }
         }
 
+        if ($recurInvoice->account->pdf_email_attachment) {
+            $invoice->updateCachedPDF();
+        }
+
         return $invoice;
     }
 
@@ -673,7 +677,7 @@ class InvoiceRepository
 
         $invoices = Invoice::whereAccountId($account->id)
                     ->where('balance', '>', 0)
-                    ->whereRaw($sql)
+                    ->whereRaw('(' . $sql . ')')
                     ->get();
 
         return $invoices;
