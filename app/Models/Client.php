@@ -39,11 +39,6 @@ class Client extends EntityModel
         return $this->hasMany('App\Models\Contact');
     }
 
-    public function projects()
-    {
-        return $this->hasMany('App\Models\Project');
-    }
-
     public function country()
     {
         return $this->belongsTo('App\Models\Country');
@@ -96,6 +91,26 @@ class Client extends EntityModel
     public function getEntityType()
     {
         return ENTITY_CLIENT;
+    }
+
+    public function hasAddress()
+    {
+        $fields = [
+            'address1',
+            'address2',
+            'city',
+            'state',
+            'postal_code',
+            'country_id',
+        ];
+
+        foreach ($fields as $field) {
+            if ($this->$field) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getWebsite()

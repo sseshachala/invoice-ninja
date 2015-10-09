@@ -51,7 +51,7 @@ class PaymentController extends BaseController
     {
         $invitationKey = Session::get('invitation_key');
         if (!$invitationKey) {
-            return Redirect::to('/setup');
+            app()->abort(404);
         }
 
         $invitation = Invitation::with('account')->where('invitation_key', '=', $invitationKey)->first();
@@ -246,6 +246,7 @@ class PaymentController extends BaseController
             'currencyCode' => $client->currency ? $client->currency->code : ($account->currency ? $account->currency->code : 'USD'),
             'account' => $client->account,
             'hideLogo' => $account->isWhiteLabel(),
+            'hideHeader' => $account->isNinjaAccount(),
             'showAddress' => $accountGateway->show_address,
         ];
 
@@ -368,7 +369,8 @@ class PaymentController extends BaseController
                 'message' => $affiliate->payment_subtitle,
                 'license' => $licenseKey,
                 'hideHeader' => true,
-                'productId' => $license->product_id
+                'productId' => $license->product_id,
+                'price' => $affiliate->price,
             ];
 
             $name = "{$license->first_name} {$license->last_name}";

@@ -62,6 +62,8 @@ Route::get('claim_license', 'PaymentController@claim_license');
 Route::post('signup/validate', 'AccountController@checkEmail');
 Route::post('signup/submit', 'AccountController@submitSignup');
 
+Route::get('auth/{provider}', 'Auth\AuthController@authLogin');
+
 
 // Laravel auth routes
 /*
@@ -350,6 +352,7 @@ if (!defined('CONTACT_EMAIL')) {
     define('DEFAULT_DATETIME_MOMENT_FORMAT', 'MMM D, YYYY h:mm:ss a');
     define('DEFAULT_QUERY_CACHE', 120); // minutes
     define('DEFAULT_LOCALE', 'en');
+    define('DEFAULT_MAP_ZOOM', 10);
 
     define('RESULT_SUCCESS', 'success');
     define('RESULT_FAILURE', 'failure');
@@ -384,12 +387,12 @@ if (!defined('CONTACT_EMAIL')) {
     define('NINJA_GATEWAY_CONFIG', 'NINJA_GATEWAY_CONFIG');
     define('NINJA_WEB_URL', 'https://www.invoiceninja.com');
     define('NINJA_APP_URL', 'https://app.invoiceninja.com');
-    define('NINJA_VERSION', '2.4.0');
+    define('NINJA_VERSION', '2.4.2');
     define('NINJA_DATE', '2000-01-01');
 
     define('NINJA_FROM_EMAIL', 'maildelivery@invoiceninja.com');
     define('RELEASES_URL', 'https://github.com/hillelcoren/invoice-ninja/releases/');
-    define('ZAPIER_URL', 'https://zapier.com/developer/invite/11276/85cf0ee4beae8e802c6c579eb4e351f1/');
+    define('ZAPIER_URL', 'https://zapier.com/zapbook/invoice-ninja');
     define('OUTDATE_BROWSER_URL', 'http://browsehappy.com/');
     define('PDFMAKE_DOCS', 'http://pdfmake.org/playground.html');
     define('PHANTOMJS_CLOUD', 'http://api.phantomjscloud.com/single/browser/v1/');
@@ -433,6 +436,12 @@ if (!defined('CONTACT_EMAIL')) {
     define('REMINDER2', 'reminder2');
     define('REMINDER3', 'reminder3');
 
+    define('SOCIAL_GOOGLE', 'Google');
+    define('SOCIAL_FACEBOOK', 'Facebook');
+    define('SOCIAL_GITHUB', 'Github');
+    define('SOCIAL_LINKEDIN', 'LinkedIn');
+
+
     $creditCards = [
                 1 => ['card' => 'images/credit_cards/Test-Visa-Icon.png', 'text' => 'Visa'],
                 2 => ['card' => 'images/credit_cards/Test-MasterCard-Icon.png', 'text' => 'Master Card'],
@@ -463,6 +472,7 @@ if (!defined('CONTACT_EMAIL')) {
     }
 }
 
+/*
 // Log all SQL queries to laravel.log
 Event::listen('illuminate.query', function($query, $bindings, $time, $name)
 {
@@ -487,7 +497,7 @@ Event::listen('illuminate.query', function($query, $bindings, $time, $name)
 
     Log::info($query, $data);
 });
-
+*/
 
 /*
 if (Auth::check() && Auth::user()->id === 1)
@@ -495,4 +505,3 @@ if (Auth::check() && Auth::user()->id === 1)
   Auth::loginUsingId(1);
 }
 */
-

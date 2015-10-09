@@ -1,7 +1,6 @@
 <?php namespace App\Http\Controllers;
 
 use Response;
-use Request;
 use Redirect;
 use Auth;
 use View;
