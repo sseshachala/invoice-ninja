@@ -406,12 +406,8 @@
                     'selected' => true,
                 ])
             @endif            
-            <li class="divider"></li>                
-            @if (count(session(SESSION_USER_ACCOUNTS)) > 1)
-                <li>{!! link_to('/manage_companies', trans('texts.manage_companies')) !!}</li>
-            @elseif (!session(SESSION_USER_ACCOUNTS) || count(session(SESSION_USER_ACCOUNTS)) < 5)
-                <li>{!! link_to('/login?new_company=true', trans('texts.add_company')) !!}</li>
-            @endif
+            <li class="divider"></li>   
+         
             <li>{!! link_to('#', trans('texts.logout'), array('onclick'=>'logout()')) !!}</li>
           </ul>
         </div>
@@ -628,7 +624,7 @@
 @if (!Utils::isNinjaProd())
 <p>&nbsp;</p>
 <div class="container">
-  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a> -
+  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
  
 </div>
 @endif
