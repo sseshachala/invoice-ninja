@@ -473,6 +473,7 @@
                     'selected' => true,
                 ])
             @endif            
+
             <li class="divider"></li>
             @if (Utils::isAdmin())
               @if (count(session(SESSION_USER_ACCOUNTS)) > 1)
@@ -809,6 +810,8 @@
       </div>
     </div>
   @endif
+  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
+
 </div>
 @endif
 
