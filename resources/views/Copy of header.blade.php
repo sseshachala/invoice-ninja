@@ -625,11 +625,43 @@
 
 @endif
 
+{{-- Per our license, please do not remove or modify this section. --}}
 @if (!Utils::isNinjaProd())
 <p>&nbsp;</p>
 <div class="container">
   {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a> -
- 
+ {-- 
+  {!! link_to(GITHUB_RELEASES, 'v' . NINJA_VERSION, ['target' => '_blank']) !!} | 
+  @if (Auth::user()->account->isWhiteLabel())  
+    {{ trans('texts.white_labeled') }}
+  @else
+    <a href="#" onclick="$('#whiteLabelModal').modal('show');">{{ trans('texts.white_label_link') }}</a>
+
+    <div class="modal fade" id="whiteLabelModal" tabindex="-1" role="dialog" aria-labelledby="whiteLabelModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h4 class="modal-title" id="myModalLabel">{{ trans('texts.white_label_header') }}</h4>
+          </div>
+
+          <div style="background-color: #fff; padding:20px">
+            <p>{{ trans('texts.white_label_text')}}</p>
+          </div>
+
+          <div class="modal-footer" id="signUpFooter" style="margin-top: 0px">          
+            <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('texts.close') }} </button>
+            {{-- DropdownButton::success_lg(trans('texts.buy'), [
+                ['url' => URL::to(""), 'label' => trans('texts.pay_with_paypal')],
+                ['url' => URL::to(""), 'label' => trans('texts.pay_with_card')]
+            ])->addClass('btn-lg') --}}
+            <button type="button" class="btn btn-primary" onclick="buyProduct('{{ WHITE_LABEL_AFFILIATE_KEY }}', '{{ PRODUCT_WHITE_LABEL }}')">{{ trans('texts.buy') }} </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    --}
+  @endif
 </div>
 @endif
 
