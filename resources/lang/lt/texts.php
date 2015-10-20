@@ -262,7 +262,7 @@ return array(
   'email_salutation' => 'Dear :name,',
   'email_signature' => 'Regards,',
   'email_from' => 'The Invoice Ninja Team',
-  'user_email_footer' => 'To adjust your email notification settings please visit '.SITE_URL.'/company/notifications',
+  'user_email_footer' => 'To adjust your email notification settings please visit '.SITE_URL.'/settings/notifications',
   'invoice_link_message' => 'To view your client invoice click the link below:',
   'notification_invoice_paid_subject' => 'Invoice :invoice was paid by :client',
   'notification_invoice_sent_subject' => 'Invoice :invoice was sent to :client',
@@ -747,7 +747,7 @@ return array(
   'current_user' => 'Current User',
   'new_recurring_invoice' => 'New Recurring Invoice',
   'recurring_invoice' => 'Recurring Invoice',
-  'recurring_too_soon' => 'It\'s too soon to create the next recurring invoice',
+  'recurring_too_soon' => 'It\'s too soon to create the next recurring invoice, it\'s scheduled for :date',
   'created_by_invoice' => 'Created by :invoice',
   'primary_user' => 'Primary User',
   'help' => 'Help',
@@ -789,7 +789,6 @@ return array(
   'reset' => 'Reset',
   'invoice_not_found' => 'The requested invoice is not available',
 
-
   'referral_program' => 'Referral Program',
   'referral_code' => 'Referral Code',
   'last_sent_on' => 'Last sent on :date',
@@ -797,6 +796,38 @@ return array(
   'page_expire' => 'This page will expire soon, :click_here to keep working',
   'upcoming_quotes' => 'Upcoming Quotes',
   'expired_quotes' => 'Expired Quotes',
+
+  'sign_up_using' => 'Sign up using',
+  'invalid_credentials' => 'These credentials do not match our records',
+  'show_all_options' => 'Show all options',
+  'user_details' => 'User Details',
+  'oneclick_login' => 'One-Click Login',
+  'disable' => 'Disable',
+  'invoice_quote_number' => 'Invoice and Quote Numbers',
+  'invoice_charges' => 'Invoice Charges',
+
+  'invitation_status' => [
+    'sent' => 'Email Sent',
+    'opened' => 'Email Openend',
+    'viewed' => 'Invoice Viewed',
+  ],
+  'notification_invoice_bounced' => 'We were unable to deliver Invoice :invoice to :contact.',
+  'notification_invoice_bounced_subject' => 'Unable to deliver Invoice :invoice',
+  'notification_quote_bounced' => 'We were unable to deliver Quote :invoice to :contact.',
+  'notification_quote_bounced_subject' => 'Unable to deliver Quote :invoice',
+
+  'custom_invoice_link' => 'Custom Invoice Link',
+  'total_invoiced' => 'Total Invoiced',
+  'open_balance' => 'Open Balance',
+  'verify_email' => 'Please visit the link in the account confirmation email to verify your email address.',
+  'basic_settings' => 'Basic Settings',
+  'pro' => 'Pro',
+  'gateways' => 'Payment Gateways',
+
+  'next_send_on' => 'Send Next: :date',
+  'no_longer_running' => 'This invoice is not scheduled to run',
+  'general_settings' => 'General Settings',
+  'customize' => 'Customize',
   
 );
 

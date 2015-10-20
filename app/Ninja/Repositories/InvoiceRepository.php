@@ -285,7 +285,7 @@ class InvoiceRepository
         
         if (!$publicId) {
             $invoice->client_id = $data['client_id'];
-            $invoice->is_recurring = $data['is_recurring'] && !Utils::isDemo() ? true : false;
+            $invoice->is_recurring = $data['is_recurring'] ? true : false;
         }
         
         if ($invoice->is_recurring) {
@@ -373,6 +373,13 @@ class InvoiceRepository
         $invoice->custom_value2 = round($data['custom_value2'], 2);
         $invoice->custom_taxes1 = $data['custom_taxes1'] ? true : false;
         $invoice->custom_taxes2 = $data['custom_taxes2'] ? true : false;
+
+        if (isset($data['custom_text_value1'])) {
+            $invoice->custom_text_value1 = trim($data['custom_text_value1']);
+        }
+        if (isset($data['custom_text_value2'])) {
+            $invoice->custom_text_value2 = trim($data['custom_text_value2']);
+        }
 
         // custom fields charged taxes
         if ($invoice->custom_value1 && $invoice->custom_taxes1) {
@@ -497,7 +504,9 @@ class InvoiceRepository
           'custom_value2',
           'custom_taxes1',
           'custom_taxes2',
-          'partial'] as $field) {
+          'partial',
+          'custom_text_value1',
+          'custom_text_value2'] as $field) {
             $clone->$field = $invoice->$field;
         }
 
@@ -567,6 +576,29 @@ class InvoiceRepository
         return count($invoices);
     }
 
+    public function findInvoiceByInvitation($invitationKey)
+    {
+        $invitation = Invitation::where('invitation_key', '=', $invitationKey)->first();
+
+        if (!$invitation) {
+            return false;
+        }
+
+        $invoice = $invitation->invoice;
+        if (!$invoice || $invoice->is_deleted) {
+            return false;
+        }
+
+        $invoice->load('user', 'invoice_items', 'invoice_design', 'account.country', 'client.contacts', 'client.country');
+        $client = $invoice->client;
+
+        if (!$client || $client->is_deleted) {
+            return false;
+        }
+
+        return $invitation;
+    }
+
     public function findOpenInvoices($clientId)
     {
         return Invoice::scope()
@@ -615,6 +647,8 @@ class InvoiceRepository
         $invoice->custom_value2 = $recurInvoice->custom_value2;
         $invoice->custom_taxes1 = $recurInvoice->custom_taxes1;
         $invoice->custom_taxes2 = $recurInvoice->custom_taxes2;
+        $invoice->custom_text_value1 = $recurInvoice->custom_text_value1;
+        $invoice->custom_text_value2 = $recurInvoice->custom_text_value2;
         $invoice->is_amount_discount = $recurInvoice->is_amount_discount;
 
         if ($invoice->client->payment_terms != 0) {
@@ -653,10 +687,6 @@ class InvoiceRepository
             if ($this->paymentService->autoBillInvoice($invoice)) {
                 $invoice->invoice_status_id = INVOICE_STATUS_PAID;
             }
-        }
-
-        if ($recurInvoice->account->pdf_email_attachment) {
-            $invoice->updateCachedPDF();
         }
 
         return $invoice;

@@ -415,9 +415,13 @@ NINJA.accountAddress = function(invoice) {
         {text: account.address2},
         {text: cityStatePostal},
         {text: account.country ? account.country.name : ''},
-        {text: invoice.account.custom_value1 ? invoice.account.custom_label1 + ' ' + invoice.account.custom_value1 : false},
-        {text: invoice.account.custom_value2 ? invoice.account.custom_label2 + ' ' + invoice.account.custom_value2 : false}
     ];
+
+    if (invoice.is_pro) {
+        data.push({text: invoice.account.custom_value1 ? invoice.account.custom_label1 + ' ' + invoice.account.custom_value1 : false});
+        data.push({text: invoice.account.custom_value2 ? invoice.account.custom_label2 + ' ' + invoice.account.custom_value2 : false});
+    }
+
     return NINJA.prepareDataList(data, 'accountAddress');
 }
 
@@ -442,6 +446,18 @@ NINJA.invoiceDetails = function(invoice) {
     ]
     ];
 
+    if (invoice.custom_text_value1) {
+        data.push([
+            {text: invoice.account.custom_invoice_text_label1},
+            {text: invoice.custom_text_value1}
+        ])
+    }
+    if (invoice.custom_text_value2) {
+        data.push([
+            {text: invoice.account.custom_invoice_text_label2},
+            {text: invoice.custom_text_value2}
+        ])
+    }
 
     var isPartial = NINJA.parseFloat(invoice.partial);
     
@@ -449,18 +465,18 @@ NINJA.invoiceDetails = function(invoice) {
         data.push([
             {text: invoiceLabels.total},
             {text: formatMoney(invoice.amount, invoice.client.currency_id)}
-            ]);
+        ]);
     } else if (isPartial) {
         data.push([
             {text: invoiceLabels.total},
             {text: formatMoney(invoice.total_amount, invoice.client.currency_id)}
-            ]);
+        ]);
     }
 
     data.push([
         {text: isPartial ? invoiceLabels.amount_due : invoiceLabels.balance_due, style: ['invoiceDetailBalanceDueLabel']},
         {text: formatMoney(invoice.balance_amount, invoice.client.currency_id), style: ['invoiceDetailBalanceDue']}
-        ])
+    ])
 
     return NINJA.prepareDataPairs(data, 'invoiceDetails');
 }

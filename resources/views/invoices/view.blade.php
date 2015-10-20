@@ -5,11 +5,8 @@
 
 		@include('script')		
 		
-		<script src="{{ asset('js/pdf_viewer.js') }}" type="text/javascript"></script>
-		<script src="{{ asset('js/compatibility.js') }}" type="text/javascript"></script>
-        <script src="{{ asset('js/pdfmake.min.js') }}" type="text/javascript"></script>
-        <script src="{{ asset('js/vfs_fonts.js') }}" type="text/javascript"></script>
-
+        <script src="{{ asset('js/pdf.built.js') }}" type="text/javascript"></script>
+        
 		<style type="text/css">
 			body {
 				background-color: #f8f8f8;		
@@ -33,7 +30,7 @@
             @if (count($paymentTypes) > 1)
                 {!! DropdownButton::success(trans('texts.pay_now'))->withContents($paymentTypes)->large() !!}
             @else
-                {!! Button::success(trans('texts.pay_now'))->asLinkTo(URL::to($paymentURL))->large() !!}
+                <a href='{!! $paymentURL !!}' class="btn btn-success btn-lg">{{ trans('texts.pay_now') }}</a>
             @endif            
 		@else 
 			{!! Button::normal('Download PDF')->withAttributes(['onclick' => 'onDownloadClick()'])->large() !!}

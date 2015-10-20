@@ -262,7 +262,7 @@ return array(
   'email_salutation' => 'Sehr geehrte/r :name,',
   'email_signature' => 'Mit freundlichen Grüßen,',
   'email_from' => 'Das InvoiceNinja Team',
-  'user_email_footer' => 'Um deine E-Mail-Benachrichtigungen anzupassen besuche bitte '.SITE_URL.'/company/notifications',
+  'user_email_footer' => 'Um deine E-Mail-Benachrichtigungen anzupassen besuche bitte '.SITE_URL.'/settings/notifications',
   'invoice_link_message' => 'Um deine Kundenrechnung anzuschauen, klicke auf den folgenden Link:',
   'notification_invoice_paid_subject' => 'Die Rechnung :invoice wurde von :client bezahlt.',
   'notification_invoice_sent_subject' => 'Die Rechnung :invoice wurde an :client versendet.',
@@ -745,7 +745,6 @@ return array(
   'current_user' => 'Aktueller Benutzer',
   'new_recurring_invoice' => 'Neue wiederkehrende Rechnung',
   'recurring_invoice' => 'Wiederkehrende Rechnung',
-  'recurring_too_soon' => 'Es ist zu früh, um die nächste wiederkehrende Rechnung zu erstellen',
   'created_by_invoice' => 'Erstellt durch :invoice',
   'primary_user' => 'Primärer Benutzer',
   'help' => 'Hilfe',
@@ -794,6 +793,39 @@ return array(
   'page_expire' => 'Diese Seite wird bald ablaufen, :click_here um weiter zu arbeiten',
   'upcoming_quotes' => 'Upcoming Quotes',
   'expired_quotes' => 'Expired Quotes',
+
+  'sign_up_using' => 'Sign up using',
+  'invalid_credentials' => 'These credentials do not match our records',
+  'show_all_options' => 'Show all options',
+  'user_details' => 'User Details',
+  'oneclick_login' => 'One-Click Login',
+  'disable' => 'Disable',
+  'invoice_quote_number' => 'Invoice and Quote Numbers',
+  'invoice_charges' => 'Invoice Charges',
+
+  'invitation_status' => [
+    'sent' => 'Email Sent',
+    'opened' => 'Email Openend',
+    'viewed' => 'Invoice Viewed',
+  ],
+  'notification_invoice_bounced' => 'We were unable to deliver Invoice :invoice to :contact.',
+  'notification_invoice_bounced_subject' => 'Unable to deliver Invoice :invoice',
+  'notification_quote_bounced' => 'We were unable to deliver Quote :invoice to :contact.',
+  'notification_quote_bounced_subject' => 'Unable to deliver Quote :invoice',
+
+  'custom_invoice_link' => 'Custom Invoice Link',
+  'total_invoiced' => 'Total Invoiced',
+  'open_balance' => 'Open Balance',
+  'verify_email' => 'Please visit the link in the account confirmation email to verify your email address.',
+  'basic_settings' => 'Basic Settings',
+  'pro' => 'Pro',
+  'gateways' => 'Payment Gateways',
+  'recurring_too_soon' => 'Es ist zu früh, um die nächste wiederkehrende Rechnung zu erstellen, it\'s scheduled for :date',
+
+  'next_send_on' => 'Send Next: :date',
+  'no_longer_running' => 'This invoice is not scheduled to run',
+  'general_settings' => 'General Settings',
+  'customize' => 'Customize',
 
 
 );

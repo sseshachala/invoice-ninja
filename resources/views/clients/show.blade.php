@@ -78,17 +78,11 @@
             @if ($client->address2)
                 {{ $client->address2 }}<br/>
             @endif
-            @if ($client->city)
-                {{ $client->city }},
-            @endif
-            @if ($client->state)
-                {{ $client->state }}
-            @endif
-            @if ($client->postal_code)
-                {{ $client->postal_code }}
+            @if ($client->getCityState())
+                {{ $client->getCityState() }}<br/>
             @endif
             @if ($client->country)
-                <br/>{{ $client->country->name }}
+                {{ $client->country->name }}<br/>
             @endif
 
             @if ($client->account->custom_client_label1 && $client->custom_value1)
@@ -114,7 +108,7 @@
             @endif            
 
 		  	@if ($client->website)
-		  	   <p>{!! $client->getWebsite() !!}</p>
+		  	   <p>{!! Utils::formatWebsite($client->website) !!}</p>
             @endif
 
             @if ($client->language)
