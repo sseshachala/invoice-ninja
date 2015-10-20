@@ -757,6 +757,10 @@
 </div>
 <br/>
 <div class="container">
+  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
+
+  {!! link_to(RELEASES_URL, 'v' . NINJA_VERSION, ['target' => '_blank']) !!} | 
+  @if (Auth::user()->account->isWhiteLabel())  
   {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a> -
 
 @if (Utils::isNinjaProd())
