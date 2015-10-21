@@ -68,7 +68,7 @@
 <div class="row">
     <div class="col-md-6">
         <div class="panel panel-default dashboard" style="height:320px">
-            <div class="panel-heading" style="background-color:#0b4d78 !important">
+            <div class="panel-heading" style="background-color:#3498DB !important">
                 <h3 class="panel-title in-bold-white">
                     <i class="glyphicon glyphicon-exclamation-sign"></i> {{ trans('texts.notifications') }}
                     <div class="pull-right" style="font-size:14px;padding-top:4px">
