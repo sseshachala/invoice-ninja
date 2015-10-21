@@ -43,7 +43,7 @@
 
         div.well {
             background-color: white;
-            color: #0b4d78;
+            color: #3498DB;
             text-transform: uppercase;
             text-align: center;
             font-weight: 600;

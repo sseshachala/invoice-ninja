@@ -146,7 +146,7 @@ line-height: 20px;
 .datepicker table {font-size: 12px; border-spacing:2px;}
 .datepicker td, .datepicker th { width:30px; }
 .datepicker table tr td.active.active, .datepicker table tr td.active:hover.active {
-background-color: #0b4d78;
+background-color: #3498DB;
     background-image:none;
 }
 .datepicker table tr td.today { color: #333; background-color: #edd71e !important; background-image:none; text-shadow:none;}
@@ -161,7 +161,7 @@ padding: 20px;
 }
 .modal-header {
 border-bottom: none;
-background-color: #0b4d78;
+background-color: #3498DB;
     padding: 20px;
     color: #fff;
 }
@@ -332,8 +332,8 @@ table td {
     max-width: 250px;
 }
 .pagination>.active>a, .pagination>.active>span, .pagination>.active>a:hover, .pagination>.active>span:hover, .pagination>.active>a:focus, .pagination>.active>span:focus {
-background-color: #0b4d78;
-border-color: #0b4d78;
+background-color: #3498DB;
+border-color: #3498DB;
 }
 .pagination>li:first-child>a, .pagination>li:first-child>span {
 border-bottom-left-radius: 3px;
@@ -396,7 +396,7 @@ font-weight: bold;
     color: #fff;
 }
 .navbar {
-  background-color: #0b4d78 !important;
+  background-color: #3498DB !important;
   background-image: none;
   background-repeat: no-repeat;
   filter: none;
@@ -437,7 +437,7 @@ canvas {
     left: -6px;
 }
 .navbar .dropdown-menu {
-    border-top: 1px solid #0b4d78;
+    border-top: 1px solid #3498DB;
 }
 .navbar-brand {
 padding-top:20px;
@@ -486,7 +486,7 @@ background-clip: padding-box;
 
 
 .active-clients {
-    background-color: #0b4d78;
+    background-color: #3498DB;
     background-image:url('../images/activeclients.png');
     background-position:center;
     background-repeat: no-repeat;
@@ -913,7 +913,7 @@ div.checkbox > label {
 
 .panel-heading {
     /*background-color: #e37329 !important;*/
-    background-color: #0b4d78 !important;
+    background-color: #3498DB !important;
 }
 
 div.alert {
