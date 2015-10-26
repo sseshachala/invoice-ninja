@@ -36,6 +36,7 @@ use App\Models\Gateway;
 use App\Models\Timezone;
 use App\Models\Industry;
 use App\Models\InvoiceDesign;
+use App\Models\TaxRate;
 use App\Ninja\Repositories\AccountRepository;
 use App\Ninja\Mailers\UserMailer;
 use App\Ninja\Mailers\ContactMailer;
@@ -156,6 +157,8 @@ class AccountController extends BaseController
             return self::showLocalization();
         } elseif ($section == ACCOUNT_PAYMENTS) {
             return self::showOnlinePayments();
+        } elseif ($section == ACCOUNT_INVOICE_SETTINGS) {
+            return self::showInvoiceSettings();
         } elseif ($section == ACCOUNT_IMPORT_EXPORT) {
             return View::make('accounts.import_export', ['title' => trans('texts.import_export')]);
         } elseif ($section == ACCOUNT_INVOICE_DESIGN || $section == ACCOUNT_CUSTOMIZE_DESIGN) {
@@ -164,6 +167,8 @@ class AccountController extends BaseController
             return self::showTemplates();
         } elseif ($section === ACCOUNT_PRODUCTS) {
             return self::showProducts();
+        } elseif ($section === ACCOUNT_TAX_RATES) {
+            return self::showTaxRates();
         } else {
             $data = [
                 'account' => Account::with('users')->findOrFail(Auth::user()->account_id),
@@ -172,6 +177,29 @@ class AccountController extends BaseController
             ];
             return View::make("accounts.{$section}", $data);
         }
+    }
+
+    private function showInvoiceSettings()
+    {
+        $account = Auth::user()->account;
+        $recurringHours = [];
+
+        for ($i=0; $i<24; $i++) {
+            if ($account->military_time) {
+                $format = 'H:i';
+            } else {
+                $format = 'g:i a';
+            }
+            $recurringHours[$i] = date($format, strtotime("{$i}:00"));
+        }
+
+        $data = [
+            'account' => Account::with('users')->findOrFail(Auth::user()->account_id),
+            'title' => trans("texts.invoice_settings"),
+            'section' => ACCOUNT_INVOICE_SETTINGS,
+            'recurringHours' => $recurringHours
+        ];
+        return View::make("accounts.invoice_settings", $data);
     }
 
     private function showCompanyDetails()
@@ -238,12 +266,30 @@ class AccountController extends BaseController
 
     private function showProducts()
     {
+        $columns = ['product', 'description', 'unit_cost'];
+        if (Auth::user()->account->invoice_item_taxes) {
+            $columns[] = 'tax_rate';
+        }
+        $columns[] = 'action';
+
         $data = [
             'account' => Auth::user()->account,
             'title' => trans('texts.product_library'),
+            'columns' => Utils::trans($columns),
         ];
 
         return View::make('accounts.products', $data);
+    }
+
+    private function showTaxRates()
+    {
+        $data = [
+            'account' => Auth::user()->account,
+            'title' => trans('texts.tax_rates'),
+            'taxRates' => TaxRate::scope()->get(['id', 'name', 'rate']),
+        ];
+
+        return View::make('accounts.tax_rates', $data);
     }
 
     private function showInvoiceDesign($section)
@@ -262,7 +308,7 @@ class AccountController extends BaseController
         $client->work_phone = '';
         $client->work_email = '';
 
-        $invoice->invoice_number = $account->getNextInvoiceNumber();
+        $invoice->invoice_number = '0000';
         $invoice->invoice_date = Utils::fromSqlDate(date('Y-m-d'));
         $invoice->account = json_decode($account->toJson());
         $invoice->amount = $invoice->balance = 100;
@@ -349,6 +395,8 @@ class AccountController extends BaseController
             return AccountController::saveEmailTemplates();
         } elseif ($section === ACCOUNT_PRODUCTS) {
             return AccountController::saveProducts();
+        } elseif ($section === ACCOUNT_TAX_RATES) {
+            return AccountController::saveTaxRates();
         }
     }
 
@@ -398,6 +446,20 @@ class AccountController extends BaseController
         return Redirect::to('settings/' . ACCOUNT_TEMPLATES_AND_REMINDERS);
     }
 
+    private function saveTaxRates()
+    {
+        $account = Auth::user()->account;
+
+        $account->invoice_taxes = Input::get('invoice_taxes') ? true : false;
+        $account->invoice_item_taxes = Input::get('invoice_item_taxes') ? true : false;
+        $account->show_item_taxes = Input::get('show_item_taxes') ? true : false;
+        $account->default_tax_rate_id = Input::get('default_tax_rate_id');
+        $account->save();
+
+        Session::flash('message', trans('texts.updated_settings'));
+        return Redirect::to('settings/' . ACCOUNT_TAX_RATES);
+    }
+
     private function saveProducts()
     {
         $account = Auth::user()->account;
@@ -414,7 +476,11 @@ class AccountController extends BaseController
     {
         if (Auth::user()->account->isPro()) {
             
-            $rules = [];
+            $rules = [
+                'invoice_number_pattern' => 'has_counter',
+                'quote_number_pattern' => 'has_counter',
+            ];
+            
             $user = Auth::user();
             $iframeURL = preg_replace('/[^a-zA-Z0-9_\-\:\/\.]/', '', substr(strtolower(Input::get('iframe_url')), 0, MAX_IFRAME_URL_LENGTH));
             $iframeURL = rtrim($iframeURL, "/");
@@ -450,18 +516,36 @@ class AccountController extends BaseController
                 $account->custom_invoice_text_label1 = trim(Input::get('custom_invoice_text_label1'));
                 $account->custom_invoice_text_label2 = trim(Input::get('custom_invoice_text_label2'));
 
-                $account->invoice_number_prefix = Input::get('invoice_number_prefix');
                 $account->invoice_number_counter = Input::get('invoice_number_counter');
                 $account->quote_number_prefix = Input::get('quote_number_prefix');
                 $account->share_counter = Input::get('share_counter') ? true : false;
 
                 $account->pdf_email_attachment = Input::get('pdf_email_attachment') ? true : false;
-                $account->auto_wrap = Input::get('auto_wrap') ? true : false;
+
+                if (Input::has('recurring_hour')) {
+                    $account->recurring_hour = Input::get('recurring_hour');
+                }
 
                 if (!$account->share_counter) {
                     $account->quote_number_counter = Input::get('quote_number_counter');
                 }
 
+                if (Input::get('invoice_number_type') == 'prefix') {
+                    $account->invoice_number_prefix = trim(Input::get('invoice_number_prefix'));
+                    $account->invoice_number_pattern = null;
+                } else {
+                    $account->invoice_number_pattern = trim(Input::get('invoice_number_pattern'));
+                    $account->invoice_number_prefix = null;
+                }
+                
+                if (Input::get('quote_number_type') == 'prefix') {
+                    $account->quote_number_prefix = trim(Input::get('quote_number_prefix'));
+                    $account->quote_number_pattern = null;
+                } else {
+                    $account->quote_number_pattern = trim(Input::get('quote_number_pattern'));
+                    $account->quote_number_prefix = null;
+                }
+                
                 if (!$account->share_counter && $account->invoice_number_prefix == $account->quote_number_prefix) {
                     Session::flash('error', trans('texts.invalid_counter'));
                     return Redirect::to('settings/' . ACCOUNT_INVOICE_SETTINGS)->withInput();

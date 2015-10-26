@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends EntityModel
 {
-    use SoftDeletes;
+    use SoftDeletes {
+        SoftDeletes::trashed as parentTrashed;
+    }
+
     protected $dates = ['deleted_at'];
 
     protected $casts = [
@@ -14,6 +17,24 @@ class Invoice extends EntityModel
         'has_tasks' => 'boolean',
         'auto_bill' => 'boolean',
     ];
+
+    public static $patternFields = [
+        'counter',
+        'custom1',
+        'custom2',
+        'userId',
+        'year',
+        'date:',
+    ];
+    
+    public function trashed()
+    {
+        if ($this->client && $this->client->trashed()) {
+            return true;
+        }
+
+        return self::parentTrashed();
+    }
 
     public function account()
     {
@@ -223,7 +244,7 @@ class Invoice extends EntityModel
         }
 
         $startDate = $this->getOriginal('last_sent_date') ?: $this->getOriginal('start_date');
-        $startDate .= ' ' . DEFAULT_SEND_RECURRING_HOUR . ':00:00';
+        $startDate .= ' ' . $this->account->recurring_hour . ':00:00';
         $startDate = $this->account->getDateTime($startDate);
         $endDate = $this->end_date ? $this->account->getDateTime($this->getOriginal('end_date')) : null;
         $timezone = $this->account->getTimezone();
@@ -249,7 +270,7 @@ class Invoice extends EntityModel
     public function getNextSendDate()
     {
         if ($this->start_date && !$this->last_sent_date) {
-            $startDate = $this->getOriginal('start_date') . ' ' . DEFAULT_SEND_RECURRING_HOUR . ':00:00';
+            $startDate = $this->getOriginal('start_date') . ' ' . $this->account->recurring_hour . ':00:00';
             return $this->account->getDateTime($startDate);
         }
 
@@ -432,7 +453,7 @@ class Invoice extends EntityModel
 
 Invoice::creating(function ($invoice) {
     if (!$invoice->is_recurring) {
-        $invoice->account->incrementCounter($invoice->is_quote);
+        $invoice->account->incrementCounter($invoice);
     }
 });
 

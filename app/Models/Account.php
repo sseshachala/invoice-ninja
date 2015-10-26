@@ -20,6 +20,7 @@ class Account extends Eloquent
         ACCOUNT_USER_DETAILS,
         ACCOUNT_LOCALIZATION,
         ACCOUNT_PAYMENTS,
+        ACCOUNT_TAX_RATES,
         ACCOUNT_PRODUCTS,
         ACCOUNT_NOTIFICATIONS,
         ACCOUNT_IMPORT_EXPORT,
@@ -104,6 +105,11 @@ class Account extends Eloquent
     public function industry()
     {
         return $this->belongsTo('App\Models\Industry');
+    }
+
+    public function default_tax_rate()
+    {
+        return $this->belongsTo('App\Models\TaxRate');
     }
 
     public function isGatewayConfigured($gatewayId = 0)
@@ -237,10 +243,131 @@ class Account extends Eloquent
         return $height;
     }
 
-    public function getNextInvoiceNumber($isQuote = false, $prefix = '')
+    public function createInvoice($entityType, $clientId = null)
     {
-        $counter = $isQuote && !$this->share_counter ? $this->quote_number_counter : $this->invoice_number_counter;
-        $prefix .= $isQuote ? $this->quote_number_prefix : $this->invoice_number_prefix;
+        $invoice = Invoice::createNew();
+
+        $invoice->invoice_date = Utils::today();
+        $invoice->start_date = Utils::today();
+        $invoice->invoice_design_id = $this->invoice_design_id;
+        $invoice->client_id = $clientId;
+        
+        if ($entityType === ENTITY_RECURRING_INVOICE) {
+            $invoice->invoice_number = microtime(true);
+            $invoice->is_recurring = true;
+        } else {
+            if ($entityType == ENTITY_QUOTE) {
+                $invoice->is_quote = true;
+            }
+
+            if ($this->hasClientNumberPattern($invoice) && !$clientId) {
+                // do nothing, we don't yet know the value
+            } else {
+                $invoice->invoice_number = $this->getNextInvoiceNumber($invoice);
+            }
+        }
+        
+        if (!$clientId) {
+            $invoice->client = Client::createNew();
+            $invoice->client->public_id = 0;
+        }
+
+        return $invoice;
+    }
+
+    public function hasNumberPattern($isQuote)
+    {
+        return $isQuote ? ($this->quote_number_pattern ? true : false) : ($this->invoice_number_pattern ? true : false);
+    }
+
+    public function hasClientNumberPattern($invoice)
+    {
+        $pattern = $invoice->is_quote ? $this->quote_number_pattern : $this->invoice_number_pattern;
+        
+        return strstr($pattern, '$custom');
+    }
+
+    public function getNumberPattern($invoice)
+    {
+        $pattern = $invoice->is_quote ? $this->quote_number_pattern : $this->invoice_number_pattern;
+
+        if (!$pattern) {
+            return false;
+        }
+
+        $search = ['{$year}'];
+        $replace = [date('Y')];
+
+        $search[] = '{$counter}';
+        $replace[] = str_pad($this->getCounter($invoice->is_quote), 4, '0', STR_PAD_LEFT);
+
+        if (strstr($pattern, '{$userId}')) {
+            $search[] = '{$userId}';
+            $replace[] = str_pad($invoice->user->public_id, 2, '0', STR_PAD_LEFT);
+        }
+
+        $matches = false;
+        preg_match('/{\$date:(.*?)}/', $pattern, $matches);
+        if (count($matches) > 1) {
+            $format = $matches[1];
+            $search[] = $matches[0];
+            $replace[] = str_replace($format, date($format), $matches[1]);
+        }
+
+        $pattern = str_replace($search, $replace, $pattern);
+
+        if ($invoice->client->id) {
+            $pattern = $this->getClientInvoiceNumber($pattern, $invoice);
+        }
+
+        return $pattern;
+    }
+
+    private function getClientInvoiceNumber($pattern, $invoice)
+    {
+        if (!$invoice->client) {
+            return $pattern;
+        }
+
+        $search = [
+            //'{$clientId}',
+            '{$custom1}',
+            '{$custom2}',
+        ];
+
+        $replace = [
+            //str_pad($client->public_id, 3, '0', STR_PAD_LEFT),
+            $invoice->client->custom_value1,
+            $invoice->client->custom_value2,
+        ];
+
+        return str_replace($search, $replace, $pattern);
+    }
+
+    // if we're using a pattern we don't know the next number until a client
+    // is selected, to support this the default value is blank
+    public function getDefaultInvoiceNumber($invoice = false)
+    {
+        if ($this->hasClientNumberPattern($invoice)) {
+            return false;
+        }
+
+        return $this->getNextInvoiceNumber($invoice);
+    }
+
+    public function getCounter($isQuote)
+    {
+        return $isQuote && !$this->share_counter ? $this->quote_number_counter : $this->invoice_number_counter;
+    }
+
+    public function getNextInvoiceNumber($invoice)
+    {
+        if ($this->hasNumberPattern($invoice->is_quote)) {
+            return $this->getNumberPattern($invoice);
+        }
+
+        $counter = $this->getCounter($invoice->is_quote);
+        $prefix = $invoice->is_quote ? $this->quote_number_prefix : $this->invoice_number_prefix;
         $counterOffset = 0;
 
         // confirm the invoice number isn't already taken 
@@ -253,7 +380,7 @@ class Account extends Eloquent
 
         // update the invoice counter to be caught up
         if ($counterOffset > 1) {
-            if ($isQuote && !$this->share_counter) {
+            if ($invoice->is_quote && !$this->share_counter) {
                 $this->quote_number_counter += $counterOffset - 1;
             } else {
                 $this->invoice_number_counter += $counterOffset - 1;
@@ -265,22 +392,15 @@ class Account extends Eloquent
         return $number;
     }
 
-    public function incrementCounter($isQuote = false)
+    public function incrementCounter($invoice)
     {
-        if ($isQuote && !$this->share_counter) {
+        if ($invoice->is_quote && !$this->share_counter) {
             $this->quote_number_counter += 1;
         } else {
             $this->invoice_number_counter += 1;
         }
-
+        
         $this->save();
-    }
-
-    public function getLocale()
-    {
-        $language = Language::where('id', '=', $this->account->language_id)->first();
-
-        return $language->locale;
     }
 
     public function loadLocalizationSettings($client = false)
