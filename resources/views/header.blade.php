@@ -816,6 +816,7 @@
   @endif
   {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
 
+
 </div>
 @endif
 
