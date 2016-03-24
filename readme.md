@@ -10,9 +10,10 @@
 If you'd like to use our code to sell your own invoicing app email us for details about our affiliate program.
 
 ### Installation Options
-* [Zip - Free](https://www.invoiceninja.com/knowledgebase/self-host/)
-* [Bitnami - Free](https://bitnami.com/stack/invoice-ninja)
-* [Softaculous - $30](https://www.softaculous.com/apps/ecommerce/Invoice_Ninja)
+* [Self-Host Zip](https://www.invoiceninja.com/knowledgebase/self-host/) - Free
+* [Docker File](https://github.com/rollbrettler/Dockerfiles/blob/master/invoice-ninja/Dockerfile) - Free
+* [Bitnami](https://bitnami.com/stack/invoice-ninja) - Free
+* [Softaculous](https://www.softaculous.com/apps/ecommerce/Invoice_Ninja) - $30
 
 ### Features
 * Built using Laravel 5

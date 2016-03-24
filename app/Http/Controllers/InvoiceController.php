@@ -31,7 +31,6 @@ use App\Models\Gateway;
 use App\Ninja\Mailers\ContactMailer as Mailer;
 use App\Ninja\Repositories\InvoiceRepository;
 use App\Ninja\Repositories\ClientRepository;
-use App\Ninja\Repositories\TaxRateRepository;
 use App\Events\InvoiceViewed;
 
 class InvoiceController extends BaseController
@@ -39,16 +38,14 @@ class InvoiceController extends BaseController
     protected $mailer;
     protected $invoiceRepo;
     protected $clientRepo;
-    protected $taxRateRepo;
 
-    public function __construct(Mailer $mailer, InvoiceRepository $invoiceRepo, ClientRepository $clientRepo, TaxRateRepository $taxRateRepo)
+    public function __construct(Mailer $mailer, InvoiceRepository $invoiceRepo, ClientRepository $clientRepo)
     {
         parent::__construct();
 
         $this->mailer = $mailer;
         $this->invoiceRepo = $invoiceRepo;
         $this->clientRepo = $clientRepo;
-        $this->taxRateRepo = $taxRateRepo;
     }
 
     public function index()
@@ -168,9 +165,7 @@ class InvoiceController extends BaseController
         } else {
             $invoice->invoice_design->javascript = $invoice->invoice_design->pdfmake;
         }
-
-        $contact = $invitation->contact;
-        $contact->setVisible([
+        $contact = $invitation->contact; $contact->setVisible([
             'first_name',
             'last_name',
             'email',
@@ -238,6 +233,7 @@ class InvoiceController extends BaseController
 
     public function edit($publicId, $clone = false)
     {
+        $account = Auth::user()->account;
         $invoice = Invoice::scope($publicId)->withTrashed()->with('invitations', 'account.country', 'client.contacts', 'client.country', 'invoice_items')->firstOrFail();
         $entityType = $invoice->getEntityType();
         
@@ -250,7 +246,7 @@ class InvoiceController extends BaseController
 
         if ($clone) {
             $invoice->id = null;
-            $invoice->invoice_number = Auth::user()->account->getNextInvoiceNumber($invoice->is_quote);
+            $invoice->invoice_number = $account->getNextInvoiceNumber($invoice);
             $invoice->balance = $invoice->amount;
             $invoice->invoice_status_id = 0;
             $invoice->invoice_date = date_create()->format('Y-m-d');
@@ -308,7 +304,6 @@ class InvoiceController extends BaseController
                 'entityType' => $entityType,
                 'showBreadcrumbs' => $clone,
                 'invoice' => $invoice,
-                'data' => false,
                 'method' => $method,
                 'invitationContactIds' => $contactIds,
                 'url' => $url,
@@ -351,23 +346,21 @@ class InvoiceController extends BaseController
 
     public function create($clientPublicId = 0, $isRecurring = false)
     {
-        $client = null;
-        $invoiceNumber = $isRecurring ? microtime(true) : Auth::user()->account->getNextInvoiceNumber();
-
+        $account = Auth::user()->account;
+        $clientId = null;
         if ($clientPublicId) {
-            $client = Client::scope($clientPublicId)->firstOrFail();
+            $clientId = Client::getPrivateId($clientPublicId);
         }
+        $entityType = $isRecurring ? ENTITY_RECURRING_INVOICE : ENTITY_INVOICE;
+        $invoice = $account->createInvoice($entityType, $clientId);
 
-        $data = array(
-                'entityType' => ENTITY_INVOICE,
-                'invoice' => null,
-                'data' => Input::old('data'),
-                'invoiceNumber' => $invoiceNumber,
-                'method' => 'POST',
-                'url' => 'invoices',
-                'title' => trans('texts.new_invoice'),
-                'isRecurring' => $isRecurring,
-                'client' => $client);
+        $data = [
+            'entityType' => $invoice->getEntityType(),
+            'invoice' => $invoice,
+            'method' => 'POST',
+            'url' => 'invoices',
+            'title' => trans('texts.new_invoice'),
+        ];
         $data = array_merge($data, self::getViewModel());
         
         return View::make('invoices.edit', $data);
@@ -392,8 +385,9 @@ class InvoiceController extends BaseController
         }
 
         return [
+            'data' => Input::old('data'),
             'account' => Auth::user()->account->load('country'),
-            'products' => Product::scope()->orderBy('id')->get(array('product_key', 'notes', 'cost', 'qty')),
+            'products' => Product::scope()->with('default_tax_rate')->orderBy('id')->get(),
             'countries' => Cache::get('countries'),
             'clients' => Client::scope()->with('contacts', 'country')->orderBy('name')->get(),
             'taxRates' => TaxRate::scope()->orderBy('name')->get(),
@@ -441,9 +435,8 @@ class InvoiceController extends BaseController
 
         if ($errors = $this->invoiceRepo->getErrors($input->invoice)) {
             Session::flash('error', trans('texts.invoice_error'));
-
-            return Redirect::to("{$entityType}s/create")
-                ->withInput()->withErrors($errors);
+            $url = "{$entityType}s/" . ($publicId ?: 'create');
+            return Redirect::to($url)->withInput()->withErrors($errors);
         } else {
             $invoice = $this->saveInvoice($publicId, $input, $entityType);
             $url = "{$entityType}s/".$invoice->public_id.'/edit';
@@ -523,26 +516,12 @@ class InvoiceController extends BaseController
     {
         $invoice = $input->invoice;
 
-        $this->taxRateRepo->save($input->tax_rates);
-
         $clientData = (array) $invoice->client;
         $client = $this->clientRepo->save($invoice->client->public_id, $clientData);
 
         $invoiceData = (array) $invoice;
         $invoiceData['client_id'] = $client->id;
         $invoice = $this->invoiceRepo->save($publicId, $invoiceData, $entityType);
-
-        $account = Auth::user()->account;
-        if ($account->invoice_taxes != $input->invoice_taxes
-                    || $account->invoice_item_taxes != $input->invoice_item_taxes
-                    || $account->invoice_design_id != $input->invoice->invoice_design_id
-                    || $account->show_item_taxes != $input->show_item_taxes) {
-            $account->invoice_taxes = $input->invoice_taxes;
-            $account->invoice_item_taxes = $input->invoice_item_taxes;
-            $account->invoice_design_id = $input->invoice->invoice_design_id;
-            $account->show_item_taxes = $input->show_item_taxes;
-            $account->save();
-        }
 
         $client->load('contacts');
         $sendInvoiceIds = [];
