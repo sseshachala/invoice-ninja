@@ -9,6 +9,12 @@ class Mailer
 {
     public function sendTo($toEmail, $fromEmail, $fromName, $subject, $view, $data = [])
     {
+        // check the username is set
+        if ( ! env('POSTMARK_API_TOKEN') && ! env('MAIL_USERNAME')) {
+            return trans('texts.invalid_mail_config');
+        }
+
+        // don't send emails to dummy addresses
         if (stristr($toEmail, '@example.com')) {
             return true;
         }
@@ -50,16 +56,16 @@ class Mailer
     {
         if (isset($data['invitation'])) {
             $invitation = $data['invitation'];
-            
+            $invoice = $invitation->invoice;
+            $messageId = false;
+
             // Track the Postmark message id
             if (isset($_ENV['POSTMARK_API_TOKEN']) && $response) {
-                $json = $response->json();
-                $invitation->message_id = $json['MessageID'];
+                $json = json_decode((string) $response->getBody());
+                $messageId = $json->MessageID;
             }
-            
-            $invitation->email_error = null;
-            $invitation->sent_date = \Carbon::now()->toDateTimeString();
-            $invitation->save();
+
+            $invoice->markInvitationSent($invitation, $messageId);
         }
         
         return true;
@@ -67,7 +73,7 @@ class Mailer
 
     private function handleFailure($exception)
     {
-        if (isset($_ENV['POSTMARK_API_TOKEN']) && $exception->getResponse()) {
+        if (isset($_ENV['POSTMARK_API_TOKEN']) && method_exists($exception, 'getResponse')) {
             $response = $exception->getResponse()->getBody()->getContents();
             $response = json_decode($response);
             $emailError = nl2br($response->Message);
@@ -75,7 +81,7 @@ class Mailer
             $emailError = $exception->getMessage();
         }
 
-        Utils::logError("Email Error: $emailError");
+        //Utils::logError("Email Error: $emailError");
         
         if (isset($data['invitation'])) {
             $invitation = $data['invitation'];

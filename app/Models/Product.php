@@ -1,11 +1,17 @@
 <?php namespace App\Models;
 
+use Auth;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends EntityModel
 {
     use SoftDeletes;
     protected $dates = ['deleted_at'];
+
+    public function getEntityType()
+    {
+        return ENTITY_PRODUCT;
+    }
 
     public static function findProductByKey($key)
     {
@@ -15,5 +21,9 @@ class Product extends EntityModel
     public function default_tax_rate()
     {
         return $this->belongsTo('App\Models\TaxRate');
+    }
+    
+    public function canEdit() {
+        return Auth::user()->hasPermission('admin');
     }
 }

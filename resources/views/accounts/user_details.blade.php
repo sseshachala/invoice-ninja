@@ -21,7 +21,9 @@
         {{ Former::populateField('referral_code', true) }}
     @endif
 
-    @include('accounts.nav', ['selected' => ACCOUNT_USER_DETAILS])
+    @if (Utils::isAdmin())
+        @include('accounts.nav', ['selected' => ACCOUNT_USER_DETAILS])
+    @endif
 
     <div class="row">
         <div class="col-md-12">
@@ -38,7 +40,7 @@
 
                 <br/>
 
-                @if (Utils::isNinja())
+                @if (Utils::isOAuthEnabled())
                     {!! Former::plaintext('oneclick_login')->value(
                             $user->oauth_provider_id ? 
                                 $oauthProviderName . ' - ' . link_to('#', trans('texts.disable'), ['onclick' => 'disableSocialLogin()']) : 
@@ -49,14 +51,17 @@
 
                 @if (Utils::isNinja())
                     @if ($user->referral_code)
+                        {{ Former::setOption('capitalize_translations', false) }}
                         {!! Former::plaintext('referral_code')
-                                ->help(trans('texts.referral_code_help'))
-                                ->value($user->referral_code . ' <a href="'.REFERRAL_PROGRAM_URL.'" target="_blank" title="'.trans('texts.learn_more').'">' . Icon::create('question-sign') . '</a>') !!}
-                    @elseif (Input::has('affiliate'))
+                                ->help($referralCounts['free'] . ' ' . trans('texts.free') . ' | ' . 
+                                    $referralCounts['pro'] . ' ' . trans('texts.pro') . 
+                                    '<a href="'.REFERRAL_PROGRAM_URL.'" target="_blank" title="'.trans('texts.learn_more').'">' . Icon::create('question-sign') . '</a> ')
+                                ->value(NINJA_APP_URL . '/invoice_now?rc=' . $user->referral_code) !!}
+                    @else
                         {!! Former::checkbox('referral_code')
                                 ->help(trans('texts.referral_code_help'))
                                 ->text(trans('texts.enable') . ' <a href="'.REFERRAL_PROGRAM_URL.'" target="_blank" title="'.trans('texts.learn_more').'">' . Icon::create('question-sign') . '</a>')  !!}
-                    @endif                    
+                    @endif
                 @endif
 
                 @if (false && Utils::isNinjaDev())
@@ -68,16 +73,14 @@
 
         </div>
         <center>
-            @if (Utils::isNinja())
-                @if (Auth::user()->confirmed)
-                    {!! Button::primary(trans('texts.change_password'))
-                            ->appendIcon(Icon::create('lock'))
-                            ->large()->withAttributes(['onclick'=>'showChangePassword()']) !!}
-                @elseif (Auth::user()->registered)
-                    {!! Button::primary(trans('texts.resend_confirmation'))
-                            ->appendIcon(Icon::create('send'))
-                            ->asLinkTo(URL::to('/resend_confirmation'))->large() !!}
-                @endif
+            @if (Auth::user()->confirmed)
+                {!! Button::primary(trans('texts.change_password'))
+                        ->appendIcon(Icon::create('lock'))
+                        ->large()->withAttributes(['onclick'=>'showChangePassword()']) !!}
+            @elseif (Auth::user()->registered && Utils::isNinja())
+                {!! Button::primary(trans('texts.resend_confirmation'))
+                        ->appendIcon(Icon::create('send'))
+                        ->asLinkTo(URL::to('/resend_confirmation'))->large() !!}
             @endif
             {!! Button::success(trans('texts.save'))
                     ->submit()->large()
@@ -171,7 +174,11 @@
             $(['current_password', 'newer_password', 'confirm_password']).each(function(i, field) {
                 var $input = $('form #'+field),
                 val = $.trim($input.val());
-                var isValid = val && val.length >= 6;
+                var isValid = val;
+
+                if (field != 'current_password') {
+                    isValid = val.length >= 6;
+                }
 
                 if (isValid && field == 'confirm_password') {
                     isValid = val == $.trim($('#newer_password').val());

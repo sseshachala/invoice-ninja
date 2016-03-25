@@ -1,7 +1,15 @@
 @extends('master')
 
 @section('head')
+    @if (!empty($clientFontUrl))
+    <link href="{!! $clientFontUrl !!}" rel="stylesheet" type="text/css">
+    @else
+    <link href="//fonts.googleapis.com/css?family=Roboto:400,700,900,100" rel="stylesheet" type="text/css">
+    @endif
     <link href="{{ asset('css/built.public.css') }}?no_cache={{ NINJA_VERSION }}" rel="stylesheet" type="text/css"/>
+    @if (!empty($clientViewCSS))
+        <style type="text/css">{!! $clientViewCSS !!}</style>
+    @endif
 @stop
 
 @section('body')
@@ -62,15 +70,17 @@
             </button>
             @if (!isset($hideLogo) || !$hideLogo)
                 {{-- Per our license, please do not remove or modify this link. --}}
-                <a class="navbar-brand" href="{{ URL::to(NINJA_WEB_URL) }}" target="_blank"><img src="{{ asset('images/invoiceninja-logo.png') }}"></a>
+                <a class="navbar-brand" href="{{ URL::to(NINJA_WEB_URL) }}" target="_blank"><img src="{{ asset('images/invoiceninja-logo.png') }}" style="height:20px"></a>
             @endif            
         </div>
         <div id="navbar" class="collapse navbar-collapse">
             @if (!isset($hideHeader) || !$hideHeader)
             <ul class="nav navbar-nav navbar-right">
-                <li {{ Request::is('*client/dashboard') ? 'class="active"' : '' }}>
-                    {!! link_to('/client/dashboard', trans('texts.dashboard') ) !!}
-                </li>
+                @if (!isset($hideDashboard) || !$hideDashboard)
+                    <li {{ Request::is('*client/dashboard') ? 'class="active"' : '' }}>
+                        {!! link_to('/client/dashboard', trans('texts.dashboard') ) !!}
+                    </li>
+                @endif
                 <li {{ Request::is('*client/quotes') ? 'class="active"' : '' }}>
                     {!! link_to('/client/quotes', trans('texts.quotes') ) !!}
                 </li>
@@ -131,7 +141,9 @@
     
     <div class="bottom">
         <div class="wrap">
-            <div class="copy">Copyright &copy;2015 <a href="{{ NINJA_WEB_URL }}" target="_blank">Invoice Ninja</a>. All rights reserved.</div>
+            @if (!isset($hideLogo) || !$hideLogo)
+                <div class="copy">Copyright &copy;{{ date('Y') }} <a href="{{ NINJA_WEB_URL }}" target="_blank">Invoice Ninja</a>. All rights reserved.</div>
+            @endif
         </div><!-- .wrap -->
     </div><!-- .bottom -->
 </footer><!-- #footer -->

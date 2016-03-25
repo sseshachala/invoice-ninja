@@ -68,12 +68,14 @@ return array(
     ),
     "unique"           => "The :attribute has already been taken.",
     "url"              => "The :attribute format is invalid.",
-    
+
     "positive" => "The :attribute must be greater than zero.",
     "has_credit" => "The client does not have enough credit.",
     "notmasked" => "The values are masked",
-    "less_than" => 'The :attribute must be less than :value',
-    "has_counter" => 'The value must contain {$counter}',
+    "less_than" => "The :attribute must be less than :value",
+    "has_counter" => "The value must contain {\$counter}",
+    "valid_contacts" => "The contact must have either an email or name",
+    "valid_invoice_items" => "The invoice exceeds the maximum amount",
 
     /*
     |--------------------------------------------------------------------------

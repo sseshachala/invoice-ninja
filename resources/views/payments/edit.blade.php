@@ -1,5 +1,17 @@
 @extends('header')
 
+@section('head')
+    @parent
+
+    @include('money_script')
+
+    <style type="text/css">
+        .input-group-addon {
+            min-width: 40px;
+        }
+    </style>
+@stop
+
 @section('content')
 	
 	{!! Former::open($url)->addClass('col-md-10 col-md-offset-1 warn-on-exit')->method($method)->rules(array(
@@ -12,6 +24,9 @@
         {!! Former::populate($payment) !!}
     @endif
 
+    <span style="display:none">
+        {!! Former::text('public_id') !!}
+    </span>
 	
 	<div class="row">
 		<div class="col-md-10 col-md-offset-1">
@@ -23,6 +38,10 @@
 			 {!! Former::select('client')->addOption('', '')->addGroupClass('client-select') !!}
 			 {!! Former::select('invoice')->addOption('', '')->addGroupClass('invoice-select') !!}
 			 {!! Former::text('amount') !!}
+
+             @if (isset($paymentTypeId) && $paymentTypeId)
+               {!! Former::populateField('payment_type_id', $paymentTypeId) !!}
+             @endif
             @endif
 
             @if (!$payment || !$payment->account_gateway_id)

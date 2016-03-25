@@ -1,5 +1,7 @@
 <?php namespace App\Services;
 
+use Utils;
+use Auth;
 use URL;
 use DateTime;
 use Event;
@@ -9,23 +11,35 @@ use CreditCard;
 use App\Models\Payment;
 use App\Models\Account;
 use App\Models\Country;
+use App\Models\Client;
+use App\Models\Invoice;
 use App\Models\AccountGatewayToken;
+use App\Ninja\Repositories\PaymentRepository;
 use App\Ninja\Repositories\AccountRepository;
-use App\Events\InvoicePaid;
+use App\Services\BaseService;
+use App\Events\PaymentWasCreated;
 
-class PaymentService {
-
+class PaymentService extends BaseService
+{
     public $lastError;
+    protected $datatableService;
 
-    public function __construct(AccountRepository $accountRepo)
+    public function __construct(PaymentRepository $paymentRepo, AccountRepository $accountRepo, DatatableService $datatableService)
     {
+        $this->datatableService = $datatableService;
+        $this->paymentRepo = $paymentRepo;
         $this->accountRepo = $accountRepo;
+    }
+
+    protected function getRepo()
+    {
+        return $this->paymentRepo;
     }
 
     public function createGateway($accountGateway)
     {
         $gateway = Omnipay::create($accountGateway->gateway->provider);
-        $config = json_decode($accountGateway->config);
+        $config = $accountGateway->getConfig();
 
         foreach ($config as $key => $val) {
             if (!$val) {
@@ -33,7 +47,9 @@ class PaymentService {
             }
 
             $function = "set".ucfirst($key);
-            $gateway->$function($val);
+            if (method_exists($gateway, $function)) {
+                $gateway->$function($val);
+            }
         }
 
         if ($accountGateway->isGateway(GATEWAY_DWOLLA)) {
@@ -89,10 +105,10 @@ class PaymentService {
         $data = [
             'firstName' => $input['first_name'],
             'lastName' => $input['last_name'],
-            'number' => $input['card_number'],
-            'expiryMonth' => $input['expiration_month'],
-            'expiryYear' => $input['expiration_year'],
-            'cvv' => $input['cvv'],
+            'number' => isset($input['card_number']) ? $input['card_number'] : null,
+            'expiryMonth' => isset($input['expiration_month']) ? $input['expiration_month'] : null,
+            'expiryYear' => isset($input['expiration_year']) ? $input['expiration_year'] : null,
+            'cvv' => isset($input['cvv']) ? $input['cvv'] : '',
         ];
 
         if (isset($input['country_id'])) {
@@ -148,7 +164,7 @@ class PaymentService {
     public function createToken($gateway, $details, $accountGateway, $client, $contactId)
     {
         $tokenResponse = $gateway->createCard($details)->send();
-        $cardReference = $tokenResponse->getCardReference();
+        $cardReference = $tokenResponse->getCustomerReference();
 
         if ($cardReference) {
             $token = AccountGatewayToken::where('client_id', '=', $client->id)
@@ -171,23 +187,41 @@ class PaymentService {
         return $cardReference;
     }
 
-    public function createPayment($invitation, $ref, $payerId = null)
+    public function getCheckoutComToken($invitation)
+    {
+        $token = false;
+        $invoice = $invitation->invoice;
+        $client = $invoice->client;
+        $account = $invoice->account;
+
+        $accountGateway = $account->getGatewayConfig(GATEWAY_CHECKOUT_COM);
+        $gateway = $this->createGateway($accountGateway);
+
+        $response = $gateway->purchase([
+            'amount' => $invoice->getRequestedAmount(),
+            'currency' => $client->currency ? $client->currency->code : ($account->currency ? $account->currency->code : 'USD')
+        ])->send();
+
+        if ($response->isRedirect()) {
+            $token = $response->getTransactionReference();
+        }
+
+        Session::set($invitation->id . 'payment_type', PAYMENT_TYPE_CREDIT_CARD);
+
+        return $token;
+    }
+
+    public function createPayment($invitation, $accountGateway, $ref, $payerId = null)
     {
         $invoice = $invitation->invoice;
-        $accountGateway = $invoice->client->account->getGatewayByType(Session::get('payment_type'));
 
-        // sync pro accounts
-        if ($invoice->account->account_key == NINJA_ACCOUNT_KEY 
-                && $invoice->amount == PRO_PLAN_PRICE) {
+        // enable pro plan for hosted users
+        if ($invoice->account->account_key == NINJA_ACCOUNT_KEY && $invoice->amount == PRO_PLAN_PRICE) {
             $account = Account::with('users')->find($invoice->client->public_id);
-            if ($account->pro_plan_paid && $account->pro_plan_paid != '0000-00-00') {
-                $date = DateTime::createFromFormat('Y-m-d', $account->pro_plan_paid);
-                $account->pro_plan_paid = $date->modify('+1 year')->format('Y-m-d');
-            } else {
-                $account->pro_plan_paid = date_create()->format('Y-m-d');
-            }
+            $account->pro_plan_paid = $account->getRenewalDate();
             $account->save();
 
+            // sync pro accounts
             $user = $account->users()->first();
             $this->accountRepo->syncAccounts($user->id, $account->pro_plan_paid);
         }
@@ -201,16 +235,26 @@ class PaymentService {
         $payment->contact_id = $invitation->contact_id;
         $payment->transaction_reference = $ref;
         $payment->payment_date = date_create()->format('Y-m-d');
-        
+
         if ($payerId) {
             $payment->payer_id = $payerId;
         }
 
         $payment->save();
 
-        Event::fire(new InvoicePaid($payment));
-
         return $payment;
+    }
+
+    public function completePurchase($gateway, $accountGateway, $details, $token)
+    {
+        if ($accountGateway->isGateway(GATEWAY_MOLLIE)) {
+            $details['transactionReference'] = $token;
+            $response = $gateway->fetchTransaction($details)->send();
+            return $gateway->fetchTransaction($details)->send();
+        } else {
+
+            return $gateway->completePurchase($details)->send();
+        }
     }
 
     public function autoBillInvoice($invoice)
@@ -228,13 +272,95 @@ class PaymentService {
         // setup the gateway/payment info
         $gateway = $this->createGateway($accountGateway);
         $details = $this->getPaymentDetails($invitation, $accountGateway);
-        $details['cardReference'] = $token;
+        $details['customerReference'] = $token;
 
         // submit purchase/get response
         $response = $gateway->purchase($details)->send();
-        $ref = $response->getTransactionReference();
 
-        // create payment record
-        return $this->createPayment($invitation, $ref);
+        if ($response->isSuccessful()) {
+            $ref = $response->getTransactionReference();
+            return $this->createPayment($invitation, $accountGateway, $ref);
+        } else {
+            return false;
+        }
     }
+
+    public function getDatatable($clientPublicId, $search)
+    {
+        $query = $this->paymentRepo->find($clientPublicId, $search);
+
+        if(!Utils::hasPermission('view_all')){
+            $query->where('payments.user_id', '=', Auth::user()->id);
+        }
+
+        return $this->createDatatable(ENTITY_PAYMENT, $query, !$clientPublicId);
+    }
+
+    protected function getDatatableColumns($entityType, $hideClient)
+    {
+        return [
+            [
+                'invoice_number',
+                function ($model) {
+                    if(!Invoice::canEditItemByOwner($model->invoice_user_id)){
+                        return $model->invoice_number;
+                    }
+                    
+                    return link_to("invoices/{$model->invoice_public_id}/edit", $model->invoice_number, ['class' => Utils::getEntityRowClass($model)])->toHtml();
+                }
+            ],
+            [
+                'client_name',
+                function ($model) {
+                    if(!Client::canViewItemByOwner($model->client_user_id)){
+                        return Utils::getClientDisplayName($model);
+                    }
+                    
+                    return $model->client_public_id ? link_to("clients/{$model->client_public_id}", Utils::getClientDisplayName($model))->toHtml() : '';
+                },
+                ! $hideClient
+            ],
+            [
+                'transaction_reference',
+                function ($model) {
+                    return $model->transaction_reference ? $model->transaction_reference : '<i>Manual entry</i>';
+                }
+            ],
+            [
+                'payment_type',
+                function ($model) {
+                    return $model->payment_type ? $model->payment_type : ($model->account_gateway_id ? $model->gateway_name : '');
+                }
+            ],
+            [
+                'amount',
+                function ($model) {
+                    return Utils::formatMoney($model->amount, $model->currency_id, $model->country_id);
+                }
+            ],
+            [
+                'payment_date',
+                function ($model) {
+                    return Utils::dateToString($model->payment_date);
+                }
+            ]
+        ];
+    }
+
+    protected function getDatatableActions($entityType)
+    {
+        return [
+            [
+                trans('texts.edit_payment'),
+                function ($model) {
+                    return URL::to("payments/{$model->public_id}/edit");
+                },
+                function ($model) {
+                    return Payment::canEditItem($model);
+                }
+            ]
+        ];
+    }
+
+
 }

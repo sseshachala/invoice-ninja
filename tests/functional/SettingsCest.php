@@ -112,6 +112,7 @@ class SettingsCest
         $I->seeRecord('products', array('product_key' => $productKey));
     }
 
+    /*
     public function updateNotifications(FunctionalTester $I)
     {
         $I->wantTo('update notification settings');
@@ -126,22 +127,8 @@ class SettingsCest
         $I->seeResponseCodeIs(200);
         $I->seeRecord('accounts', array('invoice_terms' => $terms));
     }
-
-    public function updateInvoiceDesign(FunctionalTester $I)
-    {
-        $I->wantTo('update invoice design');
-        $I->amOnPage('/settings/invoice_design');
-
-        $color = $this->faker->hexcolor;
-
-        $I->fillField(['name' => 'labels_item'], $this->faker->text(14));
-        $I->fillField(['name' => 'primary_color'], $color);
-        $I->click('Save');
-
-        $I->seeResponseCodeIs(200);
-        $I->seeRecord('accounts', array('primary_color' => $color));
-    }
-
+    */
+    
     public function updateInvoiceSettings(FunctionalTester $I)
     {
         $I->wantTo('update invoice settings');
@@ -231,7 +218,7 @@ class SettingsCest
             $I->see('Successfully created gateway');
             $I->seeRecord('account_gateways', array('gateway_id' => 23));
         } else {
-            $config = json_decode($gateway->config);
+            $config = $gateway->getConfig();
             $apiKey = $config->apiKey;
         }
 

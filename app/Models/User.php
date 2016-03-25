@@ -14,7 +14,12 @@ use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Model implements AuthenticatableContract, CanResetPasswordContract {
-
+    public static $all_permissions = array(
+        'create_all' => 0b0001,
+        'view_all' => 0b0010,
+        'edit_all' => 0b0100,
+    );    
+    
     use Authenticatable, CanResetPassword;
 
     /**
@@ -24,14 +29,18 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
      */
     protected $table = 'users';
 
-    protected $connection = 'mysql-b2b';
-
     /**
      * The attributes that are mass assignable.
      *
      * @var array
      */
-    protected $fillable = ['name', 'email', 'password'];
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'email',
+        'password',
+        'phone',
+    ];
 
     /**
      * The attributes excluded from the model's JSON form.
@@ -51,6 +60,11 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
     public function theme()
     {
         return $this->belongsTo('App\Models\Theme');
+    }
+
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = $this->attributes['username'] = $value;
     }
 
     public function getName()
@@ -96,6 +110,21 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
     public function isPro()
     {
         return $this->account->isPro();
+    }
+
+    public function isPaidPro()
+    {
+        return $this->isPro() && ! $this->isTrial();
+    }
+
+    public function isTrial()
+    {
+        return $this->account->isTrial();
+    }
+
+    public function isEligibleForTrial()
+    {
+        return $this->account->isEligibleForTrial();
     }
 
     public function maxInvoiceDesignId()
@@ -144,7 +173,7 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
 
     public function getMaxNumClients()
     {
-        if ($this->isPro()) {
+        if ($this->isPro() && ! $this->isTrial()) {
             return MAX_NUM_CLIENTS_PRO;
         }
 
@@ -155,6 +184,16 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
         return MAX_NUM_CLIENTS;
     }
 
+    public function getMaxNumVendors()
+    {
+        if ($this->isPro() && ! $this->isTrial()) {
+            return MAX_NUM_VENDORS_PRO;
+        }
+
+        return MAX_NUM_VENDORS;
+    }
+    
+    
     public function getRememberToken()
     {
         return $this->remember_token;
@@ -219,7 +258,69 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
                 && $this->email != $this->getOriginal('email')
                 && $this->getOriginal('confirmed');
     }
+    
+    
+    
+    /**
+     * Set the permissions attribute on the model.
+     *
+     * @param  mixed  $value
+     * @return $this
+     */
+     protected function setPermissionsAttribute($value){
+         if(empty($value)) {
+             $this->attributes['permissions'] = 0;
+         } else {         
+             $bitmask = 0;
+             foreach($value as $permission){
+                $bitmask = $bitmask | static::$all_permissions[$permission];
+             }
 
+             $this->attributes['permissions'] = $bitmask;
+         }
+         
+         return $this;
+    }
+    
+    /**
+     * Expands the value of the permissions attribute
+     *
+     * @param  mixed  $value
+     * @return mixed
+     */
+    protected function getPermissionsAttribute($value){
+        $permissions = array();
+        foreach(static::$all_permissions as $permission => $bitmask){
+            if(($value & $bitmask) == $bitmask) {
+                $permissions[$permission] = $permission;
+            }
+        }
+         
+        return $permissions;
+    }
+    
+    /**
+     * Checks to see if the user has the required permission
+     *
+     * @param  mixed  $permission Either a single permission or an array of possible permissions
+     * @param boolean True to require all permissions, false to require only one
+     * @return boolean
+     */
+    public function hasPermission($permission, $requireAll = false){
+        if ($this->is_admin) {
+            return true;
+        } else if(is_string($permission)){
+            return !empty($this->permissions[$permission]);
+        } else if(is_array($permission)) {
+            if($requireAll){
+                return count(array_diff($permission, $this->permissions)) == 0;
+            } else {
+                return count(array_intersect($permission, $this->permissions)) > 0;
+            }
+        }
+        
+        return false;
+    }
 }
 
 User::updating(function ($user) {

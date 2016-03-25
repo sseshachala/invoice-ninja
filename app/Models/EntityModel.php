@@ -24,7 +24,10 @@ class EntityModel extends Eloquent
             Utils::fatalError();
         }
 
-        $lastEntity = $className::withTrashed()->scope(false, $entity->account_id)->orderBy('public_id', 'DESC')->first();
+        $lastEntity = $className::withTrashed()
+                        ->scope(false, $entity->account_id)
+                        ->orderBy('public_id', 'DESC')
+                        ->first();
 
         if ($lastEntity) {
             $entity->public_id = $lastEntity->public_id + 1;
@@ -39,7 +42,7 @@ class EntityModel extends Eloquent
     {
         $className = get_called_class();
 
-        return $className::scope($publicId)->pluck('id');
+        return $className::scope($publicId)->withTrashed()->value('id');
     }
 
     public function getActivityKey()
@@ -78,6 +81,11 @@ class EntityModel extends Eloquent
         return $query;
     }
 
+    public function scopeWithArchived($query)
+    {
+        return $query->withTrashed()->where('is_deleted', '=', false);
+    }
+
     public function getName()
     {
         return $this->public_id;
@@ -88,32 +96,73 @@ class EntityModel extends Eloquent
         return $this->getName();
     }
 
-    // Remap ids to public_ids and show name
-    public function toPublicArray()
+    public function setNullValues()
     {
-        $data = $this->toArray();
-
-        foreach ($this->attributes as $key => $val) {
-            if (strpos($key, '_id')) {
-                list($field, $id) = explode('_', $key);
-                if ($field == 'account') {
-                    // do nothing
-                } else {
-                    $entity = @$this->$field;
-                    if ($entity) {
-                        $data["{$field}_name"] = $entity->getName();
-                    }
-                }
+        foreach ($this->fillable as $field) {
+            if (strstr($field, '_id') && !$this->$field) {
+                $this->$field = null;
             }
         }
-
-        $data = Utils::hideIds($data);
-
-        return $data;
     }
 
-    public function isBeingDeleted()
+    // converts "App\Models\Client" to "client_id"
+    public function getKeyField()
     {
-        return $this->is_deleted && !$this->getOriginal('is_deleted');
+        $class = get_class($this);
+        $parts = explode('\\', $class);
+        $name = $parts[count($parts)-1];
+        return strtolower($name) . '_id';
+    }
+    
+    public static function canCreate() {
+        return Auth::user()->hasPermission('create_all');
+    }
+    
+    public function canEdit() {
+        return static::canEditItem($this);
+    }
+    
+    public static function canEditItem($item) {
+        return Auth::user()->hasPermission('edit_all') || (isset($item->user_id) && Auth::user()->id == $item->user_id);
+    }
+    
+    public static function canEditItemById($item_id) {
+        if(Auth::user()->hasPermission('edit_all')) {
+            return true;
+        }
+        
+        return static::whereId($item_id)->first()->user_id == Auth::user()->id;
+    }
+    
+    public static function canEditItemByOwner($user_id) {
+        if(Auth::user()->hasPermission('edit_all')) {
+            return true;
+        }
+        
+        return Auth::user()->id == $user_id;
+    }
+    
+    public function canView() {
+        return static::canViewItem($this);
+    }
+    
+    public static function canViewItem($item) {
+        return Auth::user()->hasPermission('view_all') || (isset($item->user_id) && Auth::user()->id == $item->user_id);
+    }
+    
+    public static function canViewItemById($item_id) {
+        if(Auth::user()->hasPermission('view_all')) {
+            return true;
+        }
+        
+        return static::whereId($item_id)->first()->user_id == Auth::user()->id;
+    }
+    
+    public static function canViewItemByOwner($user_id) {
+        if(Auth::user()->hasPermission('view_all')) {
+            return true;
+        }
+        
+        return Auth::user()->id == $user_id;
     }
 }

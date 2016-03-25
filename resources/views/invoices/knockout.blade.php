@@ -6,13 +6,14 @@ function ViewModel(data) {
 
     //self.invoice = data ? false : new InvoiceModel();
     self.invoice = ko.observable(data ? false : new InvoiceModel());
+    self.expense_currency_id = ko.observable();
     self.tax_rates = ko.observableArray();
     self.tax_rates.push(new TaxRateModel());  // add blank row
-
+    self.products = {!! $products !!};
 
     self.loadClient = function(client) {
         ko.mapping.fromJS(client, model.invoice().client().mapping, model.invoice().client);
-        @if (!$invoice)
+        @if (!$invoice->id)
             self.setDueDate();
         @endif
     }
@@ -29,8 +30,8 @@ function ViewModel(data) {
                 if (paymentTerms == -1) paymentTerms = 0;
                 var dueDate = $('#invoice_date').datepicker('getDate');
                 dueDate.setDate(dueDate.getDate() + paymentTerms);
-                self.invoice().due_date(dueDate);   
-                // We're using the datepicker to handle the date formatting 
+                self.invoice().due_date(dueDate);
+                // We're using the datepicker to handle the date formatting
                 self.invoice().due_date($('#due_date').val());
             }
         @endif
@@ -51,7 +52,7 @@ function ViewModel(data) {
                 return new TaxRateModel(options.data);
             }
         },
-    }       
+    }
 
     if (data) {
         ko.mapping.fromJS(data, self.mapping, self);
@@ -63,7 +64,7 @@ function ViewModel(data) {
         }
         if (self.invoice().tax_rate() > 0) {
             return true;
-        }           
+        }
         return false;
     });
 
@@ -82,7 +83,7 @@ function ViewModel(data) {
 
     self.addTaxRate = function(data) {
         var itemModel = new TaxRateModel(data);
-        self.tax_rates.push(itemModel); 
+        self.tax_rates.push(itemModel);
         applyComboboxListeners();
     }
 
@@ -118,17 +119,17 @@ function ViewModel(data) {
         trackEvent('/activity', '/view_client_form');
         self.clientBackup = ko.mapping.toJS(self.invoice().client);
 
-        $('#emailError').css( "display", "none" );          
-        $('#clientModal').modal('show');            
+        $('#emailError').css( "display", "none" );
+        $('#clientModal').modal('show');
     }
 
     self.clientFormComplete = function() {
         trackEvent('/activity', '/save_client_form');
 
-        var email = $('#email0').val();
-        var firstName = $('#first_name').val();
-        var lastName = $('#last_name').val();
-        var name = $('#name').val();
+        var email = $("[name='client[contacts][0][email]']").val();
+        var firstName = $("[name='client[contacts][0][first_name]']").val();
+        var lastName = $("[name='client[contacts][0][last_name]']").val();
+        var name = $("[name='client[name]']").val();
 
         if (name) {
             //
@@ -139,10 +140,10 @@ function ViewModel(data) {
         }
 
         var isValid = true;
-        $("input[name='email']").each(function(item, value) {
+        $('input.client-email').each(function(item, value) {
             var email = $(value).val();
-            if (!name && (!email || !isValidEmailAddress(email))) {
-                isValid = false;                    
+            if (!firstName && (!email || !isValidEmailAddress(email))) {
+                isValid = false;
             }
         });
 
@@ -200,10 +201,10 @@ function InvoiceModel(data) {
     self.id = ko.observable('');
     self.discount = ko.observable('');
     self.is_amount_discount = ko.observable(0);
-    self.frequency_id = ko.observable(4); // default to monthly 
+    self.frequency_id = ko.observable(4); // default to monthly
     self.terms = ko.observable('');
-    self.default_terms = ko.observable(account.invoice_terms);
-    self.terms_placeholder = ko.observable({{ !$invoice->id && $account->invoice_terms ? 'account.invoice_terms' : false}});
+    self.default_terms = ko.observable(account.{{ $entityType }}_terms);
+    self.terms_placeholder = ko.observable({{ !$invoice->id && $account->{"{$entityType}_terms"} ? "account.{$entityType}_terms" : false}});
     self.set_default_terms = ko.observable(false);
     self.invoice_footer = ko.observable('');
     self.default_footer = ko.observable(account.invoice_footer);
@@ -214,12 +215,14 @@ function InvoiceModel(data) {
     self.invoice_date = ko.observable('');
     self.invoice_number = ko.observable('');
     self.due_date = ko.observable('');
+    self.recurring_due_date = ko.observable('');
     self.start_date = ko.observable('');
     self.end_date = ko.observable('');
     self.last_sent_date = ko.observable('');
     self.tax_name = ko.observable();
     self.tax_rate = ko.observable();
-    self.is_recurring = ko.observable(false);
+    self.is_recurring = ko.observable(0);
+    self.is_quote = ko.observable({{ $entityType == ENTITY_QUOTE ? '1' : '0' }});
     self.auto_bill = ko.observable();
     self.invoice_status_id = ko.observable(0);
     self.invoice_items = ko.observableArray();
@@ -227,7 +230,8 @@ function InvoiceModel(data) {
     self.balance = ko.observable(0);
     self.invoice_design_id = ko.observable(1);
     self.partial = ko.observable(0);
-    self.has_tasks = ko.observable(false);
+    self.has_tasks = ko.observable();
+    self.has_expenses = ko.observable();
 
     self.custom_value1 = ko.observable(0);
     self.custom_value2 = ko.observable(0);
@@ -257,22 +261,18 @@ function InvoiceModel(data) {
     self.addItem = function() {
         var itemModel = new ItemModel();
         @if ($account->hide_quantity)
-        itemModel.qty(1);
+            itemModel.qty(1);
         @endif
-        self.invoice_items.push(itemModel); 
-        applyComboboxListeners();           
+        self.invoice_items.push(itemModel);
+        applyComboboxListeners();
         return itemModel;
     }
 
     if (data) {
-        ko.mapping.fromJS(data, self.mapping, self);            
+        ko.mapping.fromJS(data, self.mapping, self);
     } else {
         self.addItem();
     }
-
-    self.productLabel = ko.computed(function() {
-        return self.has_tasks() ? invoiceLabels['date'] : invoiceLabels['item'];
-    }, this);
 
     self.qtyLabel = ko.computed(function() {
         return self.has_tasks() ? invoiceLabels['hours'] : invoiceLabels['quantity'];
@@ -289,11 +289,11 @@ function InvoiceModel(data) {
         },
         write: function(value) {
             if (value) {
-                self._tax(value);                               
+                self._tax(value);
                 self.tax_name(value.name());
                 self.tax_rate(value.rate());
             } else {
-                self._tax(false);                               
+                self._tax(false);
                 self.tax_name('');
                 self.tax_rate(0);
             }
@@ -313,7 +313,7 @@ function InvoiceModel(data) {
 
 
     self.wrapped_notes = ko.computed({
-        read: function() {                
+        read: function() {
             return this.public_notes();
         },
         write: function(value) {
@@ -339,6 +339,10 @@ function InvoiceModel(data) {
         refreshPDF(true);
     }
 
+    self.formatMoney = function(amount) {
+        var client = $.parseJSON(ko.toJSON(self.client()));
+        return formatMoneyAccount(amount, self.account, client);
+    }
 
     self.totals = ko.observable();
 
@@ -353,19 +357,19 @@ function InvoiceModel(data) {
 
     self.totals.subtotal = ko.computed(function() {
         var total = self.totals.rawSubtotal();
-        return total > 0 ? formatMoney(total, self.client().currency_id()) : '';
+        return self.formatMoney(total);
     });
 
     self.totals.rawDiscounted = ko.computed(function() {
         if (parseInt(self.is_amount_discount())) {
             return roundToTwo(self.discount());
         } else {
-            return roundToTwo(self.totals.rawSubtotal() * (self.discount()/100));           
+            return roundToTwo(self.totals.rawSubtotal() * (self.discount()/100));
         }
     });
 
     self.totals.discounted = ko.computed(function() {
-        return formatMoney(self.totals.rawDiscounted(), self.client().currency_id());
+        return self.formatMoney(self.totals.rawDiscounted());
     });
 
     self.totals.taxAmount = ko.computed(function() {
@@ -386,12 +390,14 @@ function InvoiceModel(data) {
         }
 
         var taxRate = parseFloat(self.tax_rate());
-        if (taxRate > 0) {
-            var tax = roundToTwo(total * (taxRate/100));            
-            return formatMoney(tax, self.client().currency_id());
-        } else {
-            return formatMoney(0, self.client().currency_id());
-        }
+        //if (taxRate > 0) {
+        //    var tax = roundToTwo(total * (taxRate/100));
+        //    return self.formatMoney(tax);
+        //} else {
+        //    return self.formatMoney(0);
+        //}
+        var tax = roundToTwo(total * (taxRate/100));
+        return self.formatMoney(tax);
     });
 
     self.totals.itemTaxes = ko.computed(function() {
@@ -415,7 +421,7 @@ function InvoiceModel(data) {
                 } else {
                     taxes[key] = {name:item.tax_name(), rate:item.tax_rate(), amount:taxAmount};
                 }
-            }               
+            }
         }
         return taxes;
     });
@@ -431,24 +437,24 @@ function InvoiceModel(data) {
         return count > 0;
     });
 
-    self.totals.itemTaxRates = ko.computed(function() {            
+    self.totals.itemTaxRates = ko.computed(function() {
         var taxes = self.totals.itemTaxes();
-        var parts = [];            
+        var parts = [];
         for (var key in taxes) {
             if (taxes.hasOwnProperty(key)) {
                 parts.push(taxes[key].name + ' ' + (taxes[key].rate*1) + '%');
-            }                
+            }
         }
         return parts.join('<br/>');
     });
 
     self.totals.itemTaxAmounts = ko.computed(function() {
         var taxes = self.totals.itemTaxes();
-        var parts = [];            
+        var parts = [];
         for (var key in taxes) {
             if (taxes.hasOwnProperty(key)) {
-                parts.push(formatMoney(taxes[key].amount, self.client().currency_id()));
-            }                
+                parts.push(self.formatMoney(taxes[key].amount));
+            }
         }
         return parts.join('<br/>');
     });
@@ -459,11 +465,11 @@ function InvoiceModel(data) {
 
     self.totals.paidToDate = ko.computed(function() {
         var total = self.totals.rawPaidToDate();
-        return formatMoney(total, self.client().currency_id());
+        return self.formatMoney(total);
     });
 
     self.totals.rawTotal = ko.computed(function() {
-        var total = accounting.toFixed(self.totals.rawSubtotal(),2);        
+        var total = accounting.toFixed(self.totals.rawSubtotal(),2);
         var discount = self.totals.rawDiscounted();
         total -= discount;
 
@@ -480,9 +486,8 @@ function InvoiceModel(data) {
         }
 
         var taxRate = parseFloat(self.tax_rate());
-        if (taxRate > 0) {
-            total = NINJA.parseFloat(total) + roundToTwo((total * (taxRate/100)));
-        }
+        total = NINJA.parseFloat(total) + roundToTwo(total * (taxRate/100));
+        total = roundToTwo(total);
 
         var taxes = self.totals.itemTaxes();
         for (var key in taxes) {
@@ -507,11 +512,23 @@ function InvoiceModel(data) {
     });
 
     self.totals.total = ko.computed(function() {
-        return formatMoney(self.partial() ? self.partial() : self.totals.rawTotal(), self.client().currency_id());
-    });        
+        return self.formatMoney(self.totals.rawTotal());
+    });
+
+    self.totals.partial = ko.computed(function() {
+        return self.formatMoney(self.partial());
+    });
 
     self.onDragged = function(item) {
         refreshPDF(true);
+    }
+
+    self.showResetTerms = function() {
+        return self.default_terms() && self.terms() != self.default_terms();
+    }
+
+    self.showResetFooter = function() {
+        return self.default_footer() && self.invoice_footer() != self.default_footer();
     }
 }
 
@@ -560,7 +577,7 @@ function ClientModel(data) {
     }
 
     self.removeContact = function() {
-        self.contacts.remove(this);         
+        self.contacts.remove(this);
     }
 
     self.name.display = ko.computed(function() {
@@ -568,13 +585,13 @@ function ClientModel(data) {
             return self.name();
         }
         if (self.contacts().length == 0) return;
-        var contact = self.contacts()[0];           
+        var contact = self.contacts()[0];
         if (contact.first_name() || contact.last_name()) {
-            return contact.first_name() + ' ' + contact.last_name();                
+            return contact.first_name() + ' ' + contact.last_name();
         } else {
             return contact.email();
         }
-    });             
+    });
 
     self.name.placeholder = ko.computed(function() {
         if (self.contacts().length == 0) return '';
@@ -584,13 +601,13 @@ function ClientModel(data) {
         } else {
             return contact.email();
         }
-    }); 
+    });
 
     if (data) {
         ko.mapping.fromJS(data, {}, this);
     } else {
         self.addContact();
-    }       
+    }
 }
 
 function ContactModel(data) {
@@ -599,7 +616,7 @@ function ContactModel(data) {
     self.first_name = ko.observable('');
     self.last_name = ko.observable('');
     self.email = ko.observable('');
-    self.phone = ko.observable('');     
+    self.phone = ko.observable('');
     self.send_invoice = ko.observable(false);
     self.invitation_link = ko.observable('');
     self.invitation_status = ko.observable('');
@@ -613,22 +630,23 @@ function ContactModel(data) {
     self.displayName = ko.computed(function() {
         var str = '';
         if (self.first_name() || self.last_name()) {
-            str += self.first_name() + ' ' + self.last_name() + '\n';
-        }           
+            str += (self.first_name() || '') + ' ' + (self.last_name() || '') + '\n';
+        }
         if (self.email()) {
             str += self.email() + '\n';
-        }           
+        }
 
         return str;
     });
 
     self.email.display = ko.computed(function() {
         var str = '';
+
         if (self.first_name() || self.last_name()) {
-            str += self.first_name() + ' ' + self.last_name() + '<br/>';
-        }           
+            str += (self.first_name() || '') + ' ' + (self.last_name() || '') + '<br/>';
+        }
         if (self.email()) {
-            str += self.email() + '<br/>';    
+            str += self.email() + '<br/>';
         }
         return str;
     });
@@ -642,7 +660,7 @@ function ContactModel(data) {
         @endif
 
         return str;
-    });     
+    });
 }
 
 function TaxRateModel(data) {
@@ -666,7 +684,7 @@ function TaxRateModel(data) {
             this.rate(value);
         },
         owner: this
-    });             
+    });
 
 
     self.displayName = ko.computed({
@@ -678,8 +696,8 @@ function TaxRateModel(data) {
         write: function (value) {
             // do nothing
         },
-        owner: this         
-    }); 
+        owner: this
+    });
 
     self.hideActions = function() {
         self.actionsVisible(false);
@@ -687,22 +705,25 @@ function TaxRateModel(data) {
 
     self.showActions = function() {
         self.actionsVisible(true);
-    }       
+    }
 
     self.isEmpty = function() {
         return !self.rate() && !self.name();
-    }       
+    }
 }
 
 function ItemModel(data) {
-    var self = this;        
+    var self = this;
     self.product_key = ko.observable('');
     self.notes = ko.observable('');
     self.cost = ko.observable(0);
     self.qty = ko.observable(0);
+    self.custom_value1 = ko.observable('');
+    self.custom_value2 = ko.observable('');
     self.tax_name = ko.observable('');
     self.tax_rate = ko.observable(0);
     self.task_public_id = ko.observable('');
+    self.expense_public_id = ko.observable('');
     self.actionsVisible = ko.observable(false);
 
     self._tax = ko.observable();
@@ -711,7 +732,7 @@ function ItemModel(data) {
             return self._tax();
         },
         write: function(value) {
-            self._tax(value);                               
+            self._tax(value);
             self.tax_name(value.name());
             self.tax_rate(value.rate());
         }
@@ -725,7 +746,7 @@ function ItemModel(data) {
             this.qty(value);
         },
         owner: this
-    });             
+    });
 
     this.prettyCost = ko.computed({
         read: function () {
@@ -735,7 +756,7 @@ function ItemModel(data) {
             this.cost(value);
         },
         owner: this
-    });             
+    });
 
     self.mapping = {
         'tax': {
@@ -746,7 +767,7 @@ function ItemModel(data) {
     }
 
     if (data) {
-        ko.mapping.fromJS(data, self.mapping, this);            
+        ko.mapping.fromJS(data, self.mapping, this);
     }
 
     self.wrapped_notes = ko.computed({
@@ -766,17 +787,13 @@ function ItemModel(data) {
     this.totals.rawTotal = ko.computed(function() {
         var cost = roundToTwo(NINJA.parseFloat(self.cost()));
         var qty = roundToTwo(NINJA.parseFloat(self.qty()));
-        var value = cost * qty;         
+        var value = cost * qty;
         return value ? roundToTwo(value) : 0;
     });
 
     this.totals.total = ko.computed(function() {
         var total = self.totals.rawTotal();
-        if (window.hasOwnProperty('model') && model.invoice && model.invoice() && model.invoice().client()) {
-            return total ? formatMoney(total, model.invoice().client().currency_id()) : '';
-        } else {
-            return total ? formatMoney(total, 1) : '';
-        }
+        return window.hasOwnProperty('model') && total ? model.invoice().formatMoney(total) : '';
     });
 
     this.hideActions = function() {
@@ -793,5 +810,57 @@ function ItemModel(data) {
 
     this.onSelect = function() {}
 }
+
+/* Custom binding for product key typeahead */
+ko.bindingHandlers.typeahead = {
+    init: function (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
+        var $element = $(element);
+        var allBindings = allBindingsAccessor();
+        
+        $element.typeahead({
+            highlight: true,
+            minLength: 0,
+        },
+        {
+            name: 'data',
+            display: allBindings.key,
+            source: searchData(allBindings.items, allBindings.key)
+        }).on('typeahead:select', function(element, datum, name) {
+            @if (Auth::user()->account->fill_products)
+                var model = ko.dataFor(this);
+                if (model.expense_public_id()) {
+                    return;
+                }
+                if (datum.notes) {
+                    model.notes(datum.notes);
+                }
+                if (datum.cost) {
+                    model.cost(accounting.toFixed(datum.cost, 2));
+                }
+                if (!model.qty()) {
+                    model.qty(1);
+                }
+                @if ($account->invoice_item_taxes)
+                    if (datum.default_tax_rate) {
+                        model.tax(self.model.getTaxRateById(datum.default_tax_rate.public_id));
+                    }
+                @endif
+            @endif
+            onItemChange();
+        }).on('typeahead:change', function(element, datum, name) {
+            var value = valueAccessor();
+            value(datum);
+            onItemChange();
+            refreshPDF(true);
+        });
+    },
+
+    update: function (element, valueAccessor) {
+        var value = ko.utils.unwrapObservable(valueAccessor());
+        if (value) {
+            $(element).typeahead('val', value);
+        }
+    }
+};
 
 </script>

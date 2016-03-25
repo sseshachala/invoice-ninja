@@ -24,6 +24,8 @@
 
         div.address-details {
             color: #666666;
+            font-size: 15px;
+            line-height: 1.8em;
         }
 
         div.col-md-4-left {
@@ -41,7 +43,7 @@
 
         div.well {
             background-color: white;
-            color: #3498DB;
+            color: #0b4d78;
             text-transform: uppercase;
             text-align: center;
             font-weight: 600;
@@ -108,8 +110,14 @@
                 @if ($account->getCityState())
                     {{ $account->getCityState() }}<br/>
                 @endif
+                @if ($account->country)
+                    {{ $account->country->name }}
+                @endif
             </div>
             <div class="col-md-3 address-details">
+                @if ($account->website)
+                    <i class="fa fa-globe" style="width: 20px"></i><a href="{{ $account->website }}" target="_blank">{{ $account->website }}</a><br/>
+                @endif
                 @if ($account->work_phone)
                     <i class="fa fa-phone" style="width: 20px"></i>{{ $account->work_phone }}<br/>
                 @endif
@@ -155,17 +163,19 @@
             </div>
         </div>
 
-        {!! Datatable::table()
-            ->addColumn(
-                trans('texts.date'),
-                trans('texts.message'),
-                trans('texts.balance'),
-                trans('texts.adjustment'))
-            ->setUrl(route('api.client.activity'))
-            ->setOptions('bFilter', false)
-            ->setOptions('aaSorting', [['0', 'desc']])
-            ->setOptions('sPaginationType', 'bootstrap')
-            ->render('datatable') !!}
+        <div style="min-height: 550px">
+            {!! Datatable::table()
+                ->addColumn(
+                    trans('texts.date'),
+                    trans('texts.message'),
+                    trans('texts.balance'),
+                    trans('texts.adjustment'))
+                ->setUrl(route('api.client.activity'))
+                ->setOptions('bFilter', false)
+                ->setOptions('aaSorting', [['0', 'desc']])
+                ->setOptions('sPaginationType', 'bootstrap')
+                ->render('datatable') !!}
+        </div>
 
     </div>
 

@@ -2,6 +2,39 @@ module.exports = function(grunt) {
 
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
+    dump_dir: (function() {
+      var out = {};
+      
+      grunt.file.expand({ filter: 'isDirectory'}, 'public/fonts/invoice-fonts/*').forEach(function(path) {
+        var fontName = /[^/]*$/.exec(path)[0],
+            files = {},
+            license='';
+        
+        // Add license text
+        grunt.file.expand({ filter: 'isFile'}, path+'/*.txt').forEach(function(path) {
+            var licenseText = grunt.file.read(path);
+
+            // Fix anything that could escape from the comment
+            licenseText = licenseText.replace(/\*\//g,'*\\/');
+
+            license += "/*\n"+licenseText+"\n*/";
+        });
+          
+        // Create files list
+        files['public/js/vfs_fonts/'+fontName+'.js'] = [path+'/*.ttf'];
+          
+        out[fontName] = {
+          options: {
+            pre: license+'window.ninjaFontVfs=window.ninjaFontVfs||{};window.ninjaFontVfs.'+fontName+'=',
+            rootPath: path+'/'
+          },
+          files: files
+        };
+      });      
+         
+      // Return the computed object
+      return out;
+    }()),
     concat: {
       options: {
           process: function(src, filepath) {
@@ -62,23 +95,24 @@ module.exports = function(grunt) {
           'public/vendor/bootstrap-datepicker/dist/locales/bootstrap-datepicker.no.min.js',
           'public/vendor/bootstrap-datepicker/dist/locales/bootstrap-datepicker.es.min.js',
           'public/vendor/bootstrap-datepicker/dist/locales/bootstrap-datepicker.sv.min.js',
-          'public/vendor/typeahead.js/dist/typeahead.min.js',
+          'public/vendor/typeahead.js/dist/typeahead.jquery.min.js',
           'public/vendor/accounting/accounting.min.js',
           'public/vendor/spectrum/spectrum.js',
           'public/vendor/jspdf/dist/jspdf.min.js',
           'public/vendor/moment/min/moment.min.js',
           'public/vendor/moment-timezone/builds/moment-timezone-with-data.min.js',
+          'public/vendor/stacktrace-js/dist/stacktrace-with-polyfills.min.js',
+          'public/vendor/fuse.js/src/fuse.min.js',
           //'public/vendor/moment-duration-format/lib/moment-duration-format.js',
           //'public/vendor/handsontable/dist/jquery.handsontable.full.min.js',
           //'public/vendor/pdfmake/build/pdfmake.min.js',
           //'public/vendor/pdfmake/build/vfs_fonts.js',
           //'public/js/vfs_fonts.js',
-          'public/js/lightbox.min.js',
           'public/js/bootstrap-combobox.js',
           'public/js/script.js',
           'public/js/pdf.pdfmake.js',
         ],
-        dest: 'public/js/built.js',
+        dest: 'public/built.js',
         nonull: true
       },
       js_public: {
@@ -93,7 +127,7 @@ module.exports = function(grunt) {
           'public/js/bootstrap-combobox.js',
 
         ],
-        dest: 'public/js/built.public.js',
+        dest: 'public/built.public.js',
         nonull: true
       },
       css: {
@@ -106,7 +140,6 @@ module.exports = function(grunt) {
           'public/vendor/spectrum/spectrum.css',
           'public/css/bootstrap-combobox.css',
           'public/css/typeahead.js-bootstrap.css',
-          'public/css/lightbox.css',
           //'public/vendor/handsontable/dist/jquery.handsontable.full.css',
           'public/css/style.css',
         ],
@@ -138,14 +171,15 @@ module.exports = function(grunt) {
           'public/js/pdfmake.min.js',
           'public/js/vfs_fonts.js',
         ],
-        dest: 'public/js/pdf.built.js',
+        dest: 'public/pdf.built.js',
         nonull: true
       }
     }
   });
 
   grunt.loadNpmTasks('grunt-contrib-concat');
+  grunt.loadNpmTasks('grunt-dump-dir');
 
-  grunt.registerTask('default', ['concat']);
+  grunt.registerTask('default', ['dump_dir', 'concat']);
 
 };

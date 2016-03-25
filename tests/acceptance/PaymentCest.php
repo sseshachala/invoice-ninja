@@ -1,6 +1,5 @@
 <?php
 
-use \AcceptanceTester;
 use App\Models\Payment;
 use Faker\Factory;
 
@@ -25,7 +24,7 @@ class PaymentCest
 
         // create client
         $I->amOnPage('/clients/create');
-        $I->fillField(['name' => 'email'], $clientEmail);
+        $I->fillField(['name' => 'contacts[0][email]'], $clientEmail);
         $I->click('Save');
         $I->see($clientEmail);
 
@@ -33,7 +32,7 @@ class PaymentCest
         $I->amOnPage('/products/create');
         $I->fillField(['name' => 'product_key'], $productKey);
         $I->fillField(['name' => 'notes'], $this->faker->text(80));
-        $I->fillField(['name' => 'cost'], $this->faker->numberBetween(1, 20));
+        $I->fillField(['name' => 'cost'], $this->faker->numberBetween(11, 20));
         $I->click('Save');
         $I->see($productKey);
 
@@ -41,6 +40,7 @@ class PaymentCest
         $I->amOnPage('/invoices/create');
         $I->selectDropdown($I, $clientEmail, '.client_select .dropdown-toggle');
         $I->fillField('table.invoice-table tbody tr:nth-child(1) #product_key', $productKey);
+        $I->click('table.invoice-table tbody tr:nth-child(1) .tt-selectable');
         $I->click('Save');
         $I->see($clientEmail);
 

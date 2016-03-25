@@ -49,6 +49,8 @@
         ->withAttributes(['class' => 'pull-right'])
         ->appendIcon(Icon::create('plus-sign')) !!}
 
+  @include('partials.bulk_form', ['entityType' => ENTITY_TAX_RATE])
+
   {!! Datatable::table()   
       ->addColumn(
         trans('texts.name'),
@@ -63,16 +65,7 @@
       ->render('datatable') !!}
 
   <script>
-  window.onDatatableReady = function() {        
-    $('tbody tr').mouseover(function() {
-      $(this).closest('tr').find('.tr-action').css('visibility','visible');
-    }).mouseout(function() {
-      $dropdown = $(this).closest('tr').find('.tr-action');
-      if (!$dropdown.hasClass('open')) {
-        $dropdown.css('visibility','hidden');
-      }     
-    });
-  } 
+    window.onDatatableReady = actionListHandler;
   </script>  
 
 

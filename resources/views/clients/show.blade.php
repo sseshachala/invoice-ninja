@@ -14,50 +14,66 @@
           }
         </style>
 
-        <script src="https://maps.googleapis.com/maps/api/js"></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}"></script>
     @endif
 @stop
 
 
 @section('content')
 
-	<div class="pull-right">
-		{!! Former::open('clients/bulk')->addClass('mainForm') !!}
-		<div style="display:none">
-			{!! Former::text('action') !!}
-			{!! Former::text('id')->value($client->public_id) !!}
-		</div>
+    <div class="row">
+        <div class="col-md-7">
+            <div>
+                <span style="font-size:28px">{{ $client->getDisplayName() }}</span>
+                @if ($client->trashed())
+                    &nbsp;&nbsp;{!! $client->present()->status !!}
+                @endif
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="pull-right">
+                {!! Former::open('clients/bulk')->addClass('mainForm') !!}
+                <div style="display:none">
+                    {!! Former::text('action') !!}
+                    {!! Former::text('public_id')->value($client->public_id) !!}
+                </div>
 
-        @if ($gatewayLink)
-            {!! Button::normal(trans('texts.view_in_stripe'))->asLinkTo($gatewayLink)->withAttributes(['target' => '_blank']) !!}
-        @endif
+                @if ($gatewayLink)
+                    {!! Button::normal(trans('texts.view_in_stripe'))->asLinkTo($gatewayLink)->withAttributes(['target' => '_blank']) !!}
+                @endif
 
-		@if ($client->trashed())
-			{!! Button::primary(trans('texts.restore_client'))->withAttributes(['onclick' => 'onRestoreClick()']) !!}
-		@else
-		    {!! DropdownButton::normal(trans('texts.edit_client'))
-                ->withAttributes(['class'=>'normalDropDown'])
-                ->withContents([
-			      ['label' => trans('texts.archive_client'), 'url' => "javascript:onArchiveClick()"],
-			      ['label' => trans('texts.delete_client'), 'url' => "javascript:onDeleteClick()"],
-			    ]
-			  )->split() !!}
+                @if ($client->trashed())
+                    @if ($client->canEdit())
+                        {!! Button::primary(trans('texts.restore_client'))->withAttributes(['onclick' => 'onRestoreClick()']) !!}
+                    @endif
+                @else
+                    @if ($client->canEdit())
+                    {!! DropdownButton::normal(trans('texts.edit_client'))
+                        ->withAttributes(['class'=>'normalDropDown'])
+                        ->withContents([
+                          ['label' => trans('texts.archive_client'), 'url' => "javascript:onArchiveClick()"],
+                          ['label' => trans('texts.delete_client'), 'url' => "javascript:onDeleteClick()"],
+                        ]
+                      )->split() !!}
+                    @endif
+                    @if (\App\Models\Invoice::canCreate())
+                        {!! DropdownButton::primary(trans('texts.new_invoice'))
+                                ->withAttributes(['class'=>'primaryDropDown'])
+                                ->withContents($actionLinks)->split() !!}
+                    @endif
+                @endif
+              {!! Former::close() !!}
 
-			{!! DropdownButton::primary(trans('texts.new_invoice'))
-                    ->withAttributes(['class'=>'primaryDropDown'])
-                    ->withContents($actionLinks)->split() !!}
-		@endif
-	  {!! Former::close() !!}
+            </div>
+        </div>
+    </div>
 
-	</div>
-
-
-	<h2>{{ $client->getDisplayName() }}</h2>
 	@if ($client->last_login > 0)
 	<h3 style="margin-top:0px"><small>
 		{{ trans('texts.last_logged_in') }} {{ Utils::timestampToDateTimeString(strtotime($client->last_login)) }}
 	</small></h3>
 	@endif
+    <br/>
 
     <div class="panel panel-default">
     <div class="panel-body">
@@ -163,16 +179,16 @@
     @endif
 
 	<ul class="nav nav-tabs nav-justified">
-		{!! HTML::tab_link('#activity', trans('texts.activity'), true) !!}
+		{!! Form::tab_link('#activity', trans('texts.activity'), true) !!}
         @if ($hasTasks)
-            {!! HTML::tab_link('#tasks', trans('texts.tasks')) !!}
+            {!! Form::tab_link('#tasks', trans('texts.tasks')) !!}
         @endif
 		@if ($hasQuotes && Utils::isPro())
-			{!! HTML::tab_link('#quotes', trans('texts.quotes')) !!}
+			{!! Form::tab_link('#quotes', trans('texts.quotes')) !!}
 		@endif
-		{!! HTML::tab_link('#invoices', trans('texts.invoices')) !!}
-		{!! HTML::tab_link('#payments', trans('texts.payments')) !!}
-		{!! HTML::tab_link('#credits', trans('texts.credits')) !!}
+		{!! Form::tab_link('#invoices', trans('texts.invoices')) !!}
+		{!! Form::tab_link('#payments', trans('texts.payments')) !!}
+		{!! Form::tab_link('#credits', trans('texts.credits')) !!}
 	</ul>
 
 	<div class="tab-content">
@@ -186,6 +202,7 @@
 		    		trans('texts.balance'),
 		    		trans('texts.adjustment'))
 		    	->setUrl(url('api/activities/'. $client->public_id))
+                ->setCustomValues('entityType', 'activity')
 		    	->setOptions('sPaginationType', 'bootstrap')
 		    	->setOptions('bFilter', false)
 		    	->setOptions('aaSorting', [['0', 'desc']])
@@ -203,6 +220,7 @@
                     trans('texts.description'),
                     trans('texts.status'))
                 ->setUrl(url('api/tasks/'. $client->public_id))
+                ->setCustomValues('entityType', 'tasks')
                 ->setOptions('sPaginationType', 'bootstrap')
                 ->setOptions('bFilter', false)
                 ->setOptions('aaSorting', [['0', 'desc']])
@@ -223,6 +241,7 @@
 	    			trans('texts.valid_until'),
 	    			trans('texts.status'))
 		    	->setUrl(url('api/quotes/'. $client->public_id))
+                ->setCustomValues('entityType', 'quotes')
 		    	->setOptions('sPaginationType', 'bootstrap')
 		    	->setOptions('bFilter', false)
 		    	->setOptions('aaSorting', [['0', 'desc']])
@@ -241,6 +260,7 @@
 			    		trans('texts.end_date'),
 			    		trans('texts.invoice_total'))
 			    	->setUrl(url('api/recurring_invoices/' . $client->public_id))
+                    ->setCustomValues('entityType', 'recurring_invoices')
 			    	->setOptions('sPaginationType', 'bootstrap')
 			    	->setOptions('bFilter', false)
 			    	->setOptions('aaSorting', [['0', 'asc']])
@@ -256,6 +276,7 @@
 		    			trans('texts.due_date'),
 		    			trans('texts.status'))
 		    	->setUrl(url('api/invoices/' . $client->public_id))
+                ->setCustomValues('entityType', 'invoices')
 		    	->setOptions('sPaginationType', 'bootstrap')
 		    	->setOptions('bFilter', false)
 		    	->setOptions('aaSorting', [['0', 'desc']])
@@ -272,6 +293,7 @@
 			    			trans('texts.payment_amount'),
 			    			trans('texts.payment_date'))
 				->setUrl(url('api/payments/' . $client->public_id))
+                ->setCustomValues('entityType', 'payments')
 				->setOptions('sPaginationType', 'bootstrap')
 				->setOptions('bFilter', false)
 				->setOptions('aaSorting', [['0', 'desc']])
@@ -287,6 +309,7 @@
 								trans('texts.credit_date'),
 								trans('texts.private_notes'))
 				->setUrl(url('api/credits/' . $client->public_id))
+                ->setCustomValues('entityType', 'credits')
 				->setOptions('sPaginationType', 'bootstrap')
 				->setOptions('bFilter', false)
 				->setOptions('aaSorting', [['0', 'asc']])
@@ -297,6 +320,8 @@
 
 	<script type="text/javascript">
 
+    var loadedTabs = {};
+
 	$(function() {
 		$('.normalDropDown:not(.dropdown-toggle)').click(function() {
 			window.location = '{{ URL::to('clients/' . $client->public_id . '/edit') }}';
@@ -304,6 +329,27 @@
 		$('.primaryDropDown:not(.dropdown-toggle)').click(function() {
 			window.location = '{{ URL::to('invoices/create/' . $client->public_id ) }}';
 		});
+
+        // load datatable data when tab is shown and remember last tab selected
+        $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+          var target = $(e.target).attr("href") // activated tab
+          target = target.substring(1);
+          localStorage.setItem('client_tab', target);
+          if (!loadedTabs.hasOwnProperty(target)) {
+            loadedTabs[target] = true;
+            window['load_' + target]();
+            if (target == 'invoices' && window.hasOwnProperty('load_recurring_invoices')) {
+                window['load_recurring_invoices']();
+            }
+          }
+        });
+        var tab = localStorage.getItem('client_tab') || '';
+        var selector = '.nav-tabs a[href="#' + tab.replace('#', '') + '"]';
+        if (tab && tab != 'activity' && $(selector).length) {
+            $(selector).tab('show');
+        } else {
+            window['load_activity']();
+        }
 	});
 
 	function onArchiveClick() {

@@ -54,10 +54,24 @@ function GetPdfMake(invoice, javascript, callback) {
             }
         }
 
+        // determine whether or not to show the header/footer
+        if (invoice.is_pro) {
+            if (key === 'header') {
+                return function(page, pages) {
+                    return page === 1 || invoice.account.all_pages_header == '1' ? val : '';
+                }
+            } else if (key === 'footer') {
+                return function(page, pages) {
+                    return page === pages || invoice.account.all_pages_footer == '1' ? val : '';
+                }
+            }
+        }
+
         // check for markdown
         if (key === 'text') {
             val = NINJA.parseMarkdownText(val, true);
         }
+
         /*
         if (key === 'stack') {
             val = NINJA.parseMarkdownStack(val);
@@ -81,22 +95,37 @@ function GetPdfMake(invoice, javascript, callback) {
             dd.footer[1].columns[0].stack.push({image: logoImages.imageLogo3, alignment: 'left', width: 130, margin: [40, 6, 0, 0]});
         }
     }
+    
+    
+    
+    pdfMake.fonts = {}
+    fonts = window.invoiceFonts || invoice.invoice_fonts;
 
-    /*
-    var fonts = {
-        Roboto: {
-            normal: 'Roboto-Regular.ttf',
-            bold: 'Roboto-Medium.ttf',
-            italics: 'Roboto-Italic.ttf',
-            bolditalics: 'Roboto-Italic.ttf'
-        },
-    };
-    */
+    // Add only the loaded fonts
+    $.each(fonts, function(i,font){
+        addFont(font);
+    });
+
+
+    function addFont(font){
+        if(window.ninjaFontVfs[font.folder]){
+            pdfMake.fonts[font.name] = {
+                normal: font.folder+'/'+font.normal,
+                italics: font.folder+'/'+font.italics,
+                bold: font.folder+'/'+font.bold,
+                bolditalics: font.folder+'/'+font.bolditalics
+            }
+        }
+    }
+        
+    if(!dd.defaultStyle)dd.defaultStyle = {font:NINJA.bodyFont};
+    else if(!dd.defaultStyle.font)dd.defaultStyle.font = NINJA.bodyFont;
     
     doc = pdfMake.createPdf(dd);
     doc.save = function(fileName) {
         this.download(fileName);
     };
+    
     return doc;
 }
 
@@ -123,7 +152,7 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'subtotalsHeight': (NINJA.subtotals(invoice).length * 16) + 16,
         'subtotalsWithoutBalance': NINJA.subtotals(invoice, true),        
         'subtotalsBalance': NINJA.subtotalsBalance(invoice),
-        'balanceDue': formatMoney(invoice.balance_amount, invoice.client.currency_id),
+        'balanceDue': formatMoneyInvoice(invoice.balance_amount, invoice),
         'invoiceFooter': NINJA.invoiceFooter(invoice),
         'invoiceNumber': invoice.invoice_number || ' ',
         'entityType': invoice.is_quote ? invoiceLabels.quote : invoiceLabels.invoice,
@@ -131,6 +160,9 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'fontSize': NINJA.fontSize,
         'fontSizeLarger': NINJA.fontSize + 1,
         'fontSizeLargest': NINJA.fontSize + 2,
+        'fontSizeSmaller': NINJA.fontSize - 1,
+        'bodyFont': NINJA.bodyFont,
+        'headerFont': NINJA.headerFont,
     }
 
     for (var key in json) {
@@ -158,9 +190,11 @@ NINJA.decodeJavascript = function(invoice, javascript)
             var value = getDescendantProp(invoice, field);
             if (match.indexOf('?') < 0 || value) {
                 if (invoice.partial && field == 'balance_due') {
-                    field = 'amount_due';
+                    field = 'partial_due';
+                } else if (invoice.is_quote) {
+                    field = field.replace('invoice', 'quote');
                 }
-                var label = invoiceLabels[field];            
+                var label = invoiceLabels[field];
                 if (match.indexOf('UC') >= 0) {
                     label = label.toUpperCase();
                 }
@@ -175,18 +209,28 @@ NINJA.decodeJavascript = function(invoice, javascript)
     }
 
     // search/replace values 
-    var regExp = new RegExp('"\\$[\\\w\\\.]*?Value"', 'g');
+    var regExp = new RegExp('"\\$[a-z][\\\w\\\.]*?[Value]?"', 'g');
     var matches = javascript.match(regExp);    
-    
+
     if (matches) {
         for (var i=0; i<matches.length; i++) {
             var match = matches[i];
-            field = match.substring(2, match.indexOf('Value'));
+
+            // reserved words
+            if (['"$none"', '"$firstAndLast"', '"$notFirstAndLastColumn"', '"$notFirst"', '"$amount"', '"$primaryColor"', '"$secondaryColor"'].indexOf(match) >= 0) {
+                continue;
+            }
+
+            // legacy style had 'Value' at the end
+            if (endsWith(match, 'Value"')) {
+                field = match.substring(2, match.indexOf('Value'));
+            } else {
+                field = match.substring(2, match.length - 1);
+            }            
             field = toSnakeCase(field);
-            
+
             var value = getDescendantProp(invoice, field) || ' ';
             value = doubleDollarSign(value);
-
             javascript = javascript.replace(match, '"'+value+'"');
         }
     }
@@ -215,7 +259,21 @@ NINJA.notesAndTerms = function(invoice)
 NINJA.invoiceColumns = function(invoice)
 {
     var account = invoice.account;
-    var columns = ["15%", "*"];
+    var columns = [];
+
+    if (invoice.has_product_key) {
+        columns.push("15%");
+    }
+
+    columns.push("*")
+
+    if (invoice.is_pro && account.custom_invoice_item_label1) {
+        columns.push("10%");
+    }
+    if (invoice.is_pro && account.custom_invoice_item_label2) {
+        columns.push("10%");
+    }
+
     var count = 3;
     if (account.hide_quantity == '1') {
         count--;
@@ -226,6 +284,7 @@ NINJA.invoiceColumns = function(invoice)
     for (var i=0; i<count; i++) {
         columns.push("14%");
     }
+
     return columns;
 }
 
@@ -249,17 +308,28 @@ NINJA.taxWidth = function(invoice)
 }
 
 NINJA.invoiceLines = function(invoice) {
+    var account = invoice.account;
     var total = 0;
     var shownItem = false;
-    var currencyId = invoice && invoice.client ? invoice.client.currency_id : 1;
     var hideQuantity = invoice.account.hide_quantity == '1';
     var showItemTaxes = invoice.account.show_item_taxes == '1';
 
-    var grid = [[
-        {text: invoiceLabels.item, style: ['tableHeader', 'itemTableHeader']}, 
-        {text: invoiceLabels.description, style: ['tableHeader', 'descriptionTableHeader']},
-        {text: invoiceLabels.unit_cost, style: ['tableHeader', 'costTableHeader']}
-    ]];
+    var grid = [[]];
+
+    if (invoice.has_product_key) {
+        grid[0].push({text: invoiceLabels.item, style: ['tableHeader', 'itemTableHeader']});
+    }
+
+    grid[0].push({text: invoiceLabels.description, style: ['tableHeader', 'descriptionTableHeader']});
+
+    if (invoice.is_pro && account.custom_invoice_item_label1) {
+        grid[0].push({text: account.custom_invoice_item_label1, style: ['tableHeader', 'custom1TableHeader']});
+    }
+    if (invoice.is_pro && account.custom_invoice_item_label2) {
+        grid[0].push({text: account.custom_invoice_item_label2, style: ['tableHeader', 'custom2TableHeader']});
+    }
+
+    grid[0].push({text: invoiceLabels.unit_cost, style: ['tableHeader', 'costTableHeader']});
 
     if (!hideQuantity) {
         grid[0].push({text: invoiceLabels.quantity, style: ['tableHeader', 'qtyTableHeader']});
@@ -274,7 +344,7 @@ NINJA.invoiceLines = function(invoice) {
 
         var row = [];
         var item = invoice.invoice_items[i];
-        var cost = formatMoney(item.cost, currencyId, true);
+        var cost = formatMoneyInvoice(item.cost, invoice, true);
         var qty = NINJA.parseFloat(item.qty) ? roundToTwo(NINJA.parseFloat(item.qty)) + '' : '';
         var notes = item.notes;
         var productKey = item.product_key;
@@ -289,7 +359,7 @@ NINJA.invoiceLines = function(invoice) {
         }
 
         // show at most one blank line
-        if (shownItem && (!cost || cost == '0.00' || cost == '0,00') && !notes && !productKey) {
+        if (shownItem && !notes && !productKey && (!cost || cost == '0' || cost == '0.00' || cost == '0,00')) {
             continue;
         }
 
@@ -302,15 +372,20 @@ NINJA.invoiceLines = function(invoice) {
         }
 
         var lineTotal = roundToTwo(NINJA.parseFloat(item.cost)) * roundToTwo(NINJA.parseFloat(item.qty));
-        if (showItemTaxes && tax) {
-            lineTotal += lineTotal * tax / 100;
-        }
-        lineTotal = formatMoney(lineTotal, currencyId);
+        lineTotal = formatMoneyInvoice(lineTotal, invoice);
 
         rowStyle = (i % 2 == 0) ? 'odd' : 'even';
         
-        row.push({style:["productKey", rowStyle], text:productKey || ' '}); // product key can be blank when selecting from a datalist
+        if (invoice.has_product_key) {
+            row.push({style:["productKey", rowStyle], text:productKey || ' '}); // product key can be blank when selecting from a datalist
+        }
         row.push({style:["notes", rowStyle], stack:[{text:notes || ' '}]}); 
+        if (invoice.is_pro && account.custom_invoice_item_label1) {
+            row.push({style:["customValue1", rowStyle], text:item.custom_value1 || ' '});
+        }
+        if (invoice.is_pro && account.custom_invoice_item_label2) {
+            row.push({style:["customValue2", rowStyle], text:item.custom_value2 || ' '});
+        }
         row.push({style:["cost", rowStyle], text:cost});
         if (!hideQuantity) {
             row.push({style:["quantity", rowStyle], text:qty || ' '});
@@ -334,50 +409,60 @@ NINJA.subtotals = function(invoice, hideBalance)
 
     var account = invoice.account;
     var data = [];
-    data.push([{text: invoiceLabels.subtotal}, {text: formatMoney(invoice.subtotal_amount, invoice.client.currency_id)}]);
+    data.push([{text: invoiceLabels.subtotal}, {text: formatMoneyInvoice(invoice.subtotal_amount, invoice)}]);
 
     if (invoice.discount_amount != 0) {
-        data.push([{text: invoiceLabels.discount}, {text: formatMoney(invoice.discount_amount, invoice.client.currency_id)}]);        
+        data.push([{text: invoiceLabels.discount}, {text: formatMoneyInvoice(invoice.discount_amount, invoice)}]);
     }
     
     if (NINJA.parseFloat(invoice.custom_value1) && invoice.custom_taxes1 == '1') {
-        data.push([{text: account.custom_invoice_label1}, {text: formatMoney(invoice.custom_value1, invoice.client.currency_id)}]);        
+        data.push([{text: account.custom_invoice_label1}, {text: formatMoneyInvoice(invoice.custom_value1, invoice)}]);
     }
     if (NINJA.parseFloat(invoice.custom_value2) && invoice.custom_taxes2 == '1') {
-        data.push([{text: account.custom_invoice_label2}, {text: formatMoney(invoice.custom_value2, invoice.client.currency_id)}]);        
+        data.push([{text: account.custom_invoice_label2}, {text: formatMoneyInvoice(invoice.custom_value2, invoice)}]);
     }
 
     for (var key in invoice.item_taxes) {
         if (invoice.item_taxes.hasOwnProperty(key)) {
             var taxRate = invoice.item_taxes[key];            
             var taxStr = taxRate.name + ' ' + (taxRate.rate*1).toString() + '%';
-            data.push([{text: taxStr}, {text: formatMoney(taxRate.amount, invoice.client.currency_id)}]);
+            data.push([{text: taxStr}, {text: formatMoneyInvoice(taxRate.amount, invoice)}]);
         }
     }
 
     if (invoice.tax && invoice.tax.name || invoice.tax_name) {
         var taxStr = invoice.tax_name + ' ' + (invoice.tax_rate*1).toString() + '%';
-        data.push([{text: taxStr}, {text: formatMoney(invoice.tax_amount, invoice.client.currency_id)}]);        
+        data.push([{text: taxStr}, {text: formatMoneyInvoice(invoice.tax_amount, invoice)}]);        
     }
 
     if (NINJA.parseFloat(invoice.custom_value1) && invoice.custom_taxes1 != '1') {        
-        data.push([{text: account.custom_invoice_label1}, {text: formatMoney(invoice.custom_value1, invoice.client.currency_id)}]);
+        data.push([{text: account.custom_invoice_label1}, {text: formatMoneyInvoice(invoice.custom_value1, invoice)}]);
     }
     if (NINJA.parseFloat(invoice.custom_value2) && invoice.custom_taxes2 != '1') {
-        data.push([{text: account.custom_invoice_label2}, {text: formatMoney(invoice.custom_value2, invoice.client.currency_id)}]);        
+        data.push([{text: account.custom_invoice_label2}, {text: formatMoneyInvoice(invoice.custom_value2, invoice)}]);        
     }    
 
     var paid = invoice.amount - invoice.balance;
     if (invoice.account.hide_paid_to_date != '1' || paid) {
-        data.push([{text:invoiceLabels.paid_to_date}, {text:formatMoney(paid, invoice.client.currency_id)}]);        
+        data.push([{text:invoiceLabels.paid_to_date}, {text:formatMoneyInvoice(paid, invoice)}]);        
     }
 
-    if (!hideBalance) {
-        var isPartial = NINJA.parseFloat(invoice.partial);
+    var isPartial = NINJA.parseFloat(invoice.partial);
+        
+    if (!hideBalance || isPartial) {
         data.push([
-            {text: isPartial ? invoiceLabels.amount_due : invoiceLabels.balance_due, style:['balanceDueLabel']},
-            {text: formatMoney(invoice.balance_amount, invoice.client.currency_id), style:['balanceDue']}
+            { text: invoiceLabels.balance_due, style: [isPartial ? '' : 'balanceDueLabel'] },
+            { text: formatMoneyInvoice(invoice.total_amount, invoice), style: [isPartial ? '' : 'balanceDue'] }
+        ]);
+    }
+    
+    if (!hideBalance) {
+        if (isPartial) {
+            data.push([
+                { text: invoiceLabels.partial_due, style: ['balanceDueLabel'] },
+                { text: formatMoneyInvoice(invoice.balance_amount, invoice), style: ['balanceDue'] }
             ]);
+        }
     }        
 
     return NINJA.prepareDataPairs(data, 'subtotals');
@@ -386,8 +471,8 @@ NINJA.subtotals = function(invoice, hideBalance)
 NINJA.subtotalsBalance = function(invoice) {
     var isPartial = NINJA.parseFloat(invoice.partial);
     return [[
-        {text: isPartial ? invoiceLabels.amount_due : invoiceLabels.balance_due, style:['balanceDueLabel']},
-        {text: formatMoney(invoice.balance_amount, invoice.client.currency_id), style:['balanceDue']}
+        {text: isPartial ? invoiceLabels.partial_due : invoiceLabels.balance_due, style:['balanceDueLabel']},
+        {text: formatMoneyInvoice(invoice.balance_amount, invoice), style:['balanceDue']}
     ]];
 }
 
@@ -397,6 +482,7 @@ NINJA.accountDetails = function(invoice) {
         {text:account.name, style: ['accountName']},
         {text:account.id_number},
         {text:account.vat_number},
+        {text:account.website},
         {text:account.work_email},
         {text:account.work_phone}
     ];
@@ -407,7 +493,7 @@ NINJA.accountAddress = function(invoice) {
     var account = invoice.account;
     var cityStatePostal = '';    
     if (account.city || account.state || account.postal_code) {
-        var swap = account.country && account.country.swap_postal_code == '1';
+        var swap = account.country && account.country.swap_postal_code;
         cityStatePostal = formatAddress(account.city, account.state, account.postal_code, swap);
     }
     var data = [
@@ -463,19 +549,19 @@ NINJA.invoiceDetails = function(invoice) {
     
     if (NINJA.parseFloat(invoice.balance) < NINJA.parseFloat(invoice.amount)) {
         data.push([
-            {text: invoiceLabels.total},
-            {text: formatMoney(invoice.amount, invoice.client.currency_id)}
+            {text: invoiceLabels.balance_due},
+            {text: formatMoneyInvoice(invoice.amount, invoice)}
         ]);
     } else if (isPartial) {
         data.push([
-            {text: invoiceLabels.total},
-            {text: formatMoney(invoice.total_amount, invoice.client.currency_id)}
+            {text: invoiceLabels.balance_due},
+            {text: formatMoneyInvoice(invoice.total_amount, invoice)}
         ]);
     }
 
     data.push([
-        {text: isPartial ? invoiceLabels.amount_due : invoiceLabels.balance_due, style: ['invoiceDetailBalanceDueLabel']},
-        {text: formatMoney(invoice.balance_amount, invoice.client.currency_id), style: ['invoiceDetailBalanceDue']}
+        {text: isPartial ? invoiceLabels.partial_due : invoiceLabels.balance_due, style: ['invoiceDetailBalanceDueLabel']},
+        {text: formatMoneyInvoice(invoice.balance_amount, invoice), style: ['invoiceDetailBalanceDue']}
     ])
 
     return NINJA.prepareDataPairs(data, 'invoiceDetails');
@@ -494,7 +580,7 @@ NINJA.clientDetails = function(invoice) {
 
     var cityStatePostal = '';
     if (client.city || client.state || client.postal_code) {
-        var swap = client.country && client.country.swap_postal_code == '1';
+        var swap = client.country && client.country.swap_postal_code;
         cityStatePostal = formatAddress(client.city, client.state, client.postal_code, swap);
     }
 
@@ -593,6 +679,7 @@ NINJA.parseMarkdownText = function(val, groupText)
     var rules = [
         ['\\\*\\\*(\\\w.+?)\\\*\\\*', {'bold': true}], // **value**
         ['\\\*(\\\w.+?)\\\*', {'italics': true}], // *value*
+        ['^###(.*)', {'style': 'help'}], // ### Small/gray help
         ['^##(.*)', {'style': 'subheader'}], // ## Header
         ['^#(.*)', {'style': 'header'}] // # Subheader
     ];

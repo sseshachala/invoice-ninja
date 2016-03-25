@@ -3,6 +3,7 @@
 
 @section('head')
 
+  <link href="//fonts.googleapis.com/css?family=Roboto:400,700,900,100|Roboto+Slab:400,300,700&subset=latin,latin-ext" rel="stylesheet" type="text/css">
   <link href="{{ asset('css/built.css') }}?no_cache={{ NINJA_VERSION }}" rel="stylesheet" type="text/css"/>    
 
   <style type="text/css">
@@ -41,10 +42,7 @@
         }
     @endif
 
-
   </style>
-
-  @include('script')
 
 <script type="text/javascript">
 
@@ -122,21 +120,24 @@
       '&go_pro=' + $('#go_pro').val(),
       success: function(result) { 
         if (result) {
-          localStorage.setItem('guest_key', '');
-          fbq('track', 'CompleteRegistration');
-          window._fbq.push(['track', '{{ env('FACEBOOK_PIXEL_SIGN_UP') }}', {'value':'0.00','currency':'USD'}]);
-          trackEvent('/account', '/signed_up');
+          handleSignedUp();
           NINJA.isRegistered = true;
           $('#signUpButton').hide();
-          $('#myAccountButton').html(result);          
-        }            
+          $('#myAccountButton').html(result);
+        }
         $('#signUpSuccessDiv, #signUpFooter, #closeSignUpButton').show();
         $('#working, #saveSignUpButton').hide();
       }
-    });     
-  }      
-
+    });
+  }
   @endif
+
+  function handleSignedUp() {
+      localStorage.setItem('guest_key', '');
+      fbq('track', 'CompleteRegistration');
+      window._fbq.push(['track', '{{ env('FACEBOOK_PIXEL_SIGN_UP') }}', {'value':'0.00','currency':'USD'}]);
+      trackEvent('/account', '/signed_up');
+  }
 
   function checkForEnter(event)
   {
@@ -184,7 +185,7 @@
     window.open('{{ Utils::isNinjaDev() ? '' : NINJA_APP_URL }}/license?affiliate_key=' + affiliateKey + '&product_id=' + productId + '&return_url=' + window.location);
   }
 
-  @if (Auth::check() && !Auth::user()->isPro())
+  @if (Auth::check() && (!Auth::user()->isPro() || Auth::user()->isTrial()))
   function submitProPlan() {
     fbq('track', 'AddPaymentInfo');
     trackEvent('/account', '/submit_pro_plan/' + NINJA.proPlanFeature);
@@ -245,11 +246,73 @@
   }
 
   function setSignupEnabled(enabled) {
-    $('.signup-form input[type=text], .signup-form button').prop('disabled', !enabled);
+    $('.signup-form input[type=text]').prop('disabled', !enabled);
+    if (enabled) {
+        $('.signup-form a.btn').removeClass('disabled');
+    } else {
+        $('.signup-form a.btn').addClass('disabled');
+    }
   }
 
   function setSocialLoginProvider(provider) {
     localStorage.setItem('auth_provider', provider);
+  }
+
+  window.loadedSearchData = false;
+  function showSearch() {
+    $('#search').typeahead('val', '');
+    $('#navbar-options').hide();
+    $('#search-form').show();
+    $('#search').focus();
+    
+    if (!window.loadedSearchData) {
+        trackEvent('/activity', '/search');
+        $.get('{{ URL::route('getSearchData') }}', function(data) {
+          $('#search').typeahead({
+            hint: true,
+            highlight: true,
+          }
+          @if (Auth::check() && Auth::user()->account->custom_client_label1)
+          ,{
+            name: 'data',
+            display: 'value',
+            source: searchData(data['{{ Auth::user()->account->custom_client_label1 }}'], 'tokens'),
+            templates: {
+              header: '&nbsp;<span style="font-weight:600;font-size:16px">{{ Auth::user()->account->custom_client_label1 }}</span>'
+            }
+          }          
+          @endif
+          @if (Auth::check() && Auth::user()->account->custom_client_label2)
+          ,{
+            name: 'data',
+            display: 'value',
+            source: searchData(data['{{ Auth::user()->account->custom_client_label2 }}'], 'tokens'),
+            templates: {
+              header: '&nbsp;<span style="font-weight:600;font-size:16px">{{ Auth::user()->account->custom_client_label2 }}</span>'
+            }
+          }          
+          @endif
+          @foreach (['clients', 'contacts', 'invoices', 'quotes', 'navigation'] as $type)
+          ,{
+            name: 'data',
+            display: 'value',
+            source: searchData(data['{{ $type }}'], 'tokens', true),
+            templates: {
+              header: '&nbsp;<span style="font-weight:600;font-size:16px">{{ trans("texts.{$type}") }}</span>'
+            }
+          }
+          @endforeach
+          ).on('typeahead:selected', function(element, datum, name) {
+            window.location = datum.url;
+          }).focus(); 
+          window.loadedSearchData = true;
+        });
+    }
+  }
+  
+  function hideSearch() {
+    $('#search-form').hide();
+    $('#navbar-options').show();
   }
 
   $(function() {
@@ -257,39 +320,11 @@
         $(".alert-hide").fadeOut();
     }, 3000);
 
-    $('#search').blur(function(){
-      $('#search').css('width', '{{ Utils::isEnglish() ? 150 : 110 }}px');
-      $('ul.navbar-right').show();
+    $('#search').blur(function(event){
+        if (window.loadedSearchData) {
+            hideSearch();
+        }
     });
-
-    $('#search').focus(function(){
-      $('#search').css('width', '{{ Utils::isEnglish() ? 256 : 216 }}px');
-      $('ul.navbar-right').hide();
-      if (!window.hasOwnProperty('searchData')) {
-        trackEvent('/activity', '/search');
-        $.get('{{ URL::route('getSearchData') }}', function(data) {
-          window.searchData = true;
-          var datasets = [];
-          for (var type in data)
-          {
-            if (!data.hasOwnProperty(type)) continue;
-            datasets.push({
-              name: type,
-              header: '&nbsp;<b>' + type  + '</b>',
-              local: data[type]
-            });
-          }
-          if (datasets.length == 0) {
-            return;
-          }
-          $('#search').typeahead(datasets).on('typeahead:selected', function(element, datum, name) {
-            var type = name == 'Contacts' ? 'clients' : name.toLowerCase();
-            window.location = '{{ URL::to('/') }}' + '/' + type + '/' + datum.public_id;
-          }).focus().typeahead('setQuery', $('#search').val());                         
-        });
-      }
-    });
-
 
     if (isStorageSupported()) {
       @if (Auth::check() && !Auth::user()->registered)
@@ -319,7 +354,7 @@
       showSignUp();
     @endif
 
-    $('ul.navbar-settings, ul.navbar-history').hover(function () {
+    $('ul.navbar-settings, ul.navbar-search').hover(function () {
         if ($('.user-accounts').css('display') == 'block') {
             $('.user-accounts').dropdown('toggle');
         }
@@ -338,6 +373,14 @@
             setSignupEnabled(this.checked);
         });
     @endif
+
+    // Focus the search input if the user clicks forward slash
+    $('body').keypress(function(event) {
+        if (event.which == 47 && !$('*:focus').length) {
+            event.preventDefault();
+            showSearch();
+        }
+    });
 
   });
 
@@ -358,38 +401,43 @@
         <span class="icon-bar"></span>
       </button>
       <a href="{{ URL::to(NINJA_WEB_URL) }}" class='navbar-brand' target="_blank">
-        <img src="{{ asset('images/invoiceninja-logo.png') }}" style="height:18px;width:auto"/>
+        {{-- Per our license, please do not remove or modify this link. --}}
+        <img src="{{ asset('images/invoiceninja-logo.png') }}" style="height:20px;width:auto;padding-right:10px"/>
       </a>	    
     </div>
 
     <div class="collapse navbar-collapse" id="navbar-collapse-1">
       <ul class="nav navbar-nav" style="font-weight: bold">
-        {!! HTML::nav_link('dashboard', 'dashboard') !!}
-        {!! HTML::menu_link('client') !!}
-        {!! HTML::menu_link('task') !!}
-        {!! HTML::menu_link('invoice') !!}
-        {!! HTML::menu_link('payment') !!}
+        {!! Form::nav_link('dashboard', 'dashboard') !!}
+        {!! Form::menu_link('client') !!}
+        {!! Form::menu_link('task') !!}
+        {!! Form::menu_link('expense') !!}
+        {!! Form::menu_link('invoice') !!}
+        {!! Form::menu_link('payment') !!}
       </ul>
 
+      <div id="navbar-options">
       <div class="navbar-form navbar-right">
         @if (Auth::check())
           @if (!Auth::user()->registered)
-            {!! Button::success(trans('texts.sign_up'))->withAttributes(array('id' => 'signUpButton', 'data-toggle'=>'modal', 'data-target'=>'#signUpModal'))->small() !!} &nbsp;
-          @elseif (!Auth::user()->isPro())
-            {!! Button::success(trans('texts.go_pro'))->withAttributes(array('id' => 'proPlanButton', 'onclick' => 'showProPlan("")'))->small() !!} &nbsp;
+            {!! Button::success(trans('texts.sign_up'))->withAttributes(array('id' => 'signUpButton', 'data-toggle'=>'modal', 'data-target'=>'#signUpModal', 'style' => 'max-width:100px;;overflow:hidden'))->small() !!} &nbsp;
+          @elseif (Utils::isNinjaProd() && (!Auth::user()->isPro() || Auth::user()->isTrial()))
+            {!! Button::success(trans('texts.go_pro'))->withAttributes(array('id' => 'proPlanButton', 'onclick' => 'showProPlan("")', 'style' => 'max-width:100px;overflow:hidden'))->small() !!} &nbsp;
           @endif
         @endif
 
         <div class="btn-group user-dropdown">
           <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
-            <div id="myAccountButton" class="ellipsis" style="max-width:100px">
+            <div id="myAccountButton" class="ellipsis nav-account-name" style="max-width:{{ Utils::isPro() && ! Utils::isTrial() ? '130' : '100' }}px;">
                 @if (session(SESSION_USER_ACCOUNTS) && count(session(SESSION_USER_ACCOUNTS)))
                     {{ Auth::user()->account->getDisplayName() }}
                 @else
                     {{ Auth::user()->getDisplayName() }}
                 @endif
               <span class="caret"></span>
-            </div>            
+            </div>
+            <span class="glyphicon glyphicon-user nav-account-icon" style="padding-left:0px" 
+                title="{{ Auth::user()->account->getDisplayName() }}"/>            
           </button>			
           <ul class="dropdown-menu user-accounts">
             @if (session(SESSION_USER_ACCOUNTS))
@@ -425,8 +473,14 @@
                     'selected' => true,
                 ])
             @endif            
-            <li class="divider"></li>   
-         
+            <li class="divider"></li>
+            @if (Utils::isAdmin())
+              @if (count(session(SESSION_USER_ACCOUNTS)) > 1)
+                  <li>{!! link_to('/manage_companies', trans('texts.manage_companies')) !!}</li>
+              @elseif (!session(SESSION_USER_ACCOUNTS) || count(session(SESSION_USER_ACCOUNTS)) < 5)
+                  <li>{!! link_to('/login?new_company=true', trans('texts.add_company')) !!}</li>
+              @endif
+            @endif
             <li>{!! link_to('#', trans('texts.logout'), array('onclick'=>'logout()')) !!}</li>
           </ul>
         </div>
@@ -435,23 +489,29 @@
       
       <ul class="nav navbar-nav navbar-right navbar-settings"> 
         <li class="dropdown">
-          <a href="{{ URL::to('/settings') }}" class="dropdown-toggle">
-            <span class="glyphicon glyphicon-cog" title="{{ trans('texts.settings') }}"/>
-          </a>
-          <ul class="dropdown-menu">
-            @foreach (\App\Models\Account::$basicSettings as $setting)
-                <li>{!! link_to('settings/' . $setting, uctrans("texts.{$setting}")) !!}</li>
-            @endforeach
-            <li><a href="{{ url('settings/' . ACCOUNT_INVOICE_SETTINGS) }}">{!! uctrans('texts.advanced_settings') . Utils::getProLabel(ACCOUNT_ADVANCED_SETTINGS) !!}</a></li>
-          </ul>
+          @if (Utils::isAdmin())
+            <a href="{{ URL::to('/settings') }}" class="dropdown-toggle">
+              <span class="glyphicon glyphicon-cog" title="{{ trans('texts.settings') }}"/>
+            </a>
+            <ul class="dropdown-menu">
+              @foreach (\App\Models\Account::$basicSettings as $setting)
+                  <li>{!! link_to('settings/' . $setting, uctrans("texts.{$setting}")) !!}</li>
+              @endforeach
+              <li><a href="{{ url('settings/' . ACCOUNT_INVOICE_SETTINGS) }}">{!! uctrans('texts.advanced_settings') . Utils::getProLabel(ACCOUNT_ADVANCED_SETTINGS) !!}</a></li>
+            </ul>
+          @else
+            <a href="{{ URL::to('/settings/user_details') }}" class="dropdown-toggle">
+              <span class="glyphicon glyphicon-user" title="{{ trans('texts.settings') }}"/>
+            </a>
+          @endif
         </li>
       </ul>
 
 
-      <ul class="nav navbar-nav navbar-right navbar-history"> 
+      <ul class="nav navbar-nav navbar-right navbar-search"> 
         <li class="dropdown">
-          <a href="{{ count(Session::get(RECENTLY_VIEWED)) ? Session::get(RECENTLY_VIEWED)[0]->url : '#' }}" class="dropdown-toggle">
-            <span class="glyphicon glyphicon-time" title="{{ trans('texts.history') }}"/>
+          <a href="#" onclick="showSearch()">
+            <span class="glyphicon glyphicon-search" title="{{ trans('texts.search') }}"/>
           </a>
           <ul class="dropdown-menu">	        		        	
             @if (count(Session::get(RECENTLY_VIEWED)) == 0)
@@ -466,15 +526,14 @@
           </ul>
         </li>
       </ul>
+      </div>
 
-      <form class="navbar-form navbar-right" role="search">
+      <form id="search-form" class="navbar-form navbar-right" role="search" style="display:none">
         <div class="form-group">
-          <input type="text" id="search" style="width: {{ Utils::isEnglish() ? 150 : 110 }}px" 
-            class="form-control" placeholder="{{ trans('texts.search') }}">
+          <input type="text" id="search" style="width: 240px;padding-top:0px;padding-bottom:0px" 
+            class="form-control" placeholder="{{ trans('texts.search') . ': ' . trans('texts.search_hotkey')}}">
         </div>
       </form>
-
-
       
       
     </div><!-- /.navbar-collapse -->
@@ -508,7 +567,7 @@
   @endif
 
   @if (!isset($showBreadcrumbs) || $showBreadcrumbs)
-    {!! HTML::breadcrumbs() !!}
+    {!! Form::breadcrumbs(isset($entityStatus) ? $entityStatus : '') !!}
   @endif
 
   @yield('content')		
@@ -527,7 +586,7 @@
       <div style="background-color: #fff; padding-right:20px" id="signUpDiv" onkeyup="validateSignUp()" onclick="validateSignUp()" onkeydown="checkForEnter(event)">
         <br/>
 
-        {!! Former::open('signup/submit')->addClass('signUpForm') !!}
+        {!! Former::open('signup/submit')->addClass('signUpForm')->autocomplete('on') !!}
 
         @if (Auth::check())
         {!! Former::populateField('new_first_name', Auth::user()->first_name) !!}
@@ -546,7 +605,7 @@
                 {!! Former::checkbox('terms_checkbox')->label(' ')->text(trans('texts.agree_to_terms', ['terms' => '<a href="'.URL::to('terms').'" target="_blank">'.trans('texts.terms_of_service').'</a>']))->raw() !!}
                 <br/>
             </div>
-            @if (Utils::isNinja())
+            @if (Utils::isOAuthEnabled())
                 <div class="col-md-4 col-md-offset-1">
                     <h4>{{ trans('texts.sign_up_using') }}</h4><br/>
                     @foreach (App\Services\AuthService::$providers as $provider)
@@ -568,17 +627,36 @@
             @endif
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.large', 1) }}
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.small', 1) }}
-                {!! Former::text('new_first_name')->placeholder(trans('texts.first_name'))->label(' ') !!}
-                {!! Former::text('new_last_name')->placeholder(trans('texts.last_name'))->label(' ') !!}
-                {!! Former::text('new_email')->placeholder(trans('texts.email'))->label(' ') !!}
-                {!! Former::password('new_password')->placeholder(trans('texts.password'))->label(' ') !!}
+                
+                {!! Former::text('new_first_name')
+                        ->placeholder(trans('texts.first_name'))
+                        ->autocomplete('given-name')
+                        ->label(' ') !!}
+                {!! Former::text('new_last_name')
+                        ->placeholder(trans('texts.last_name'))
+                        ->autocomplete('family-name')
+                        ->label(' ') !!}
+                {!! Former::text('new_email')
+                        ->placeholder(trans('texts.email'))
+                        ->autocomplete('email')
+                        ->label(' ') !!}
+                {!! Former::password('new_password')
+                        ->placeholder(trans('texts.password'))
+                        ->label(' ') !!}
+                
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.large', 4) }}
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.small', 4) }}
+            </div>
+
+            <div class="col-md-11 col-md-offset-1">
+                <div style="padding-top:20px;padding-bottom:10px;">{{ trans('texts.trial_message') }}</div>
             </div>
         </div>
 
         {!! Former::close() !!}
-
+        
+        
+        
         <center><div id="errorTaken" style="display:none">&nbsp;<br/>{{ trans('texts.email_taken') }}</div></center>
         <br/>
 
@@ -631,11 +709,10 @@
 </div>
 @endif
 
-@if (Auth::check() && !Auth::user()->isPro())
+@if (Auth::check() && (!Auth::user()->isPro() || Auth::user()->isTrial()))
   <div class="modal fade" id="proPlanModal" tabindex="-1" role="dialog" aria-labelledby="proPlanModalLabel" aria-hidden="true">
     <div class="modal-dialog large-dialog">
       <div class="modal-content pro-plan-modal">
-        
 
         <div class="pull-right">
             <img onclick="hideProPlan()" class="close" src="{{ asset('images/pro_plan/close.png') }}"/>
@@ -646,7 +723,11 @@
                 <center>
                     <h2>{{ trans('texts.pro_plan_title') }}</h2>
                     <img class="img-responsive price" alt="Only $50 Per Year" src="{{ asset('images/pro_plan/price.png') }}"/>
-                    <a class="button" href="#" onclick="submitProPlan()">{{ trans('texts.pro_plan_call_to_action') }}</a>
+                    @if (Auth::user()->isEligibleForTrial())
+                        <a class="button" href="{{ URL::to('start_trial') }}">{{ trans('texts.trial_call_to_action') }}</a>
+                    @else
+                        <a class="button" href="#" onclick="submitProPlan()">{{ trans('texts.pro_plan_call_to_action') }}</a>
+                    @endif
                 </center>
             </div>
             <div class="col-md-5">
@@ -670,17 +751,25 @@
 
 @endif
 
-@if (!Utils::isNinjaProd())
 </div>
-<p>&nbsp;</p>
+<br/>
 <div class="container">
-  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
- 
-  {!! link_to(RELEASES_URL, 'v' . NINJA_VERSION, ['target' => '_blank']) !!} | 
+@if (Utils::isNinjaProd())
+  @if (Auth::check() && Auth::user()->isTrial())
+    {!! trans(Auth::user()->account->getCountTrialDaysLeft() == 0 ? 'texts.trial_footer_last_day' : 'texts.trial_footer', [
+            'count' => Auth::user()->account->getCountTrialDaysLeft(), 
+            'link' => '<a href="javascript:submitProPlan()">' . trans('texts.click_here') . '</a>'
+        ]) !!}
+  @endif
+@else
+  {{ trans('texts.powered_by') }}
+  {{-- Per our license, please do not remove or modify this section. --}}
+  {!! link_to('https://www.invoiceninja.com/?utm_source=powered_by', 'InvoiceNinja.com', ['target' => '_blank', 'title' => 'invoiceninja.com']) !!} -
+  {!! link_to(RELEASES_URL, 'v' . NINJA_VERSION, ['target' => '_blank', 'title' => trans('texts.trello_roadmap')]) !!} | 
   @if (Auth::user()->account->isWhiteLabel())  
     {{ trans('texts.white_labeled') }}
   @else
-    <a href="#" onclick="$('#whiteLabelModal').modal('show');">{{ trans('texts.white_label_link') }}</a>
+    <a href="#" onclick="loadImages('#whiteLabelModal');$('#whiteLabelModal').modal('show');">{{ trans('texts.white_label_link') }}</a>
 
     <div class="modal fade" id="whiteLabelModal" tabindex="-1" role="dialog" aria-labelledby="whiteLabelModalLabel" aria-hidden="true">
       <div class="modal-dialog">
@@ -690,8 +779,18 @@
             <h4 class="modal-title" id="myModalLabel">{{ trans('texts.white_label_header') }}</h4>
           </div>
 
-          <div style="background-color: #fff; padding:20px">
+          <div class="panel-body">
             <p>{{ trans('texts.white_label_text')}}</p>
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>{{ trans('texts.before') }}</h4>
+                    <img src="{{ BLANK_IMAGE }}" data-src="http://ninja.dev/images/pro_plan/white_label_before.png" width="100%" alt="before">
+                </div>
+                <div class="col-md-6">
+                    <h4>{{ trans('texts.after') }}</h4>
+                    <img src="{{ BLANK_IMAGE }}" data-src="http://ninja.dev/images/pro_plan/white_label_after.png" width="100%" alt="after">
+                </div>
+            </div>
           </div>
 
           <div class="modal-footer" id="signUpFooter" style="margin-top: 0px">          
@@ -706,7 +805,6 @@
       </div>
     </div>
   @endif
-
 </div>
 @endif
 

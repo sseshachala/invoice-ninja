@@ -5,21 +5,52 @@ use Utils;
 use Session;
 use DateTime;
 use Event;
+use Cache;
 use App;
+use File;
 use App\Events\UserSettingsChanged;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laracasts\Presenter\PresentableTrait;
 
 class Account extends Eloquent
 {
+    use PresentableTrait;
     use SoftDeletes;
+
+    protected $presenter = 'App\Ninja\Presenters\AccountPresenter';
     protected $dates = ['deleted_at'];
     protected $hidden = ['ip'];
+
+    protected $fillable = [
+        'name',
+        'id_number',
+        'vat_number',
+        'work_email',
+        'website',
+        'work_phone',
+        'address1',
+        'address2',
+        'city',
+        'state',
+        'postal_code',
+        'country_id',
+        'size_id',
+        'industry_id',
+        'email_footer',
+        'timezone_id',
+        'date_format_id',
+        'datetime_format_id',
+        'currency_id',
+        'language_id',
+        'military_time',
+    ];
 
     public static $basicSettings = [
         ACCOUNT_COMPANY_DETAILS,
         ACCOUNT_USER_DETAILS,
         ACCOUNT_LOCALIZATION,
         ACCOUNT_PAYMENTS,
+        ACCOUNT_BANKS,
         ACCOUNT_TAX_RATES,
         ACCOUNT_PRODUCTS,
         ACCOUNT_NOTIFICATIONS,
@@ -29,7 +60,9 @@ class Account extends Eloquent
     public static $advancedSettings = [
         ACCOUNT_INVOICE_SETTINGS,
         ACCOUNT_INVOICE_DESIGN,
+        ACCOUNT_EMAIL_SETTINGS,
         ACCOUNT_TEMPLATES_AND_REMINDERS,
+        ACCOUNT_CLIENT_PORTAL,
         ACCOUNT_CHARTS_AND_REPORTS,
         ACCOUNT_DATA_VISUALIZATIONS,
         ACCOUNT_USER_MANAGEMENT,
@@ -41,7 +74,11 @@ class Account extends Eloquent
         'invoice_settings' => 'object',
     ];
     */
-    
+    public function account_tokens()
+    {
+        return $this->hasMany('App\Models\AccountToken');
+    }
+
     public function users()
     {
         return $this->hasMany('App\Models\User');
@@ -50,6 +87,11 @@ class Account extends Eloquent
     public function clients()
     {
         return $this->hasMany('App\Models\Client');
+    }
+
+    public function contacts()
+    {
+        return $this->hasMany('App\Models\Contact');
     }
 
     public function invoices()
@@ -62,9 +104,19 @@ class Account extends Eloquent
         return $this->hasMany('App\Models\AccountGateway');
     }
 
+    public function bank_accounts()
+    {
+        return $this->hasMany('App\Models\BankAccount');
+    }
+
     public function tax_rates()
     {
         return $this->hasMany('App\Models\TaxRate');
+    }
+
+    public function products()
+    {
+        return $this->hasMany('App\Models\Product');
     }
 
     public function country()
@@ -112,6 +164,33 @@ class Account extends Eloquent
         return $this->belongsTo('App\Models\TaxRate');
     }
 
+    public function expenses()
+    {
+        return $this->hasMany('App\Models\Expense','account_id','id')->withTrashed();
+    }
+
+    public function payments()
+    {
+        return $this->hasMany('App\Models\Payment','account_id','id')->withTrashed();
+    }
+
+    public function setIndustryIdAttribute($value)
+    {
+        $this->attributes['industry_id'] = $value ?: null;
+    }
+
+    public function setCountryIdAttribute($value)
+    {
+        $this->attributes['country_id'] = $value ?: null;
+    }
+
+    public function setSizeIdAttribute($value)
+    {
+        $this->attributes['size_id'] = $value ?: null;
+    }
+
+
+
     public function isGatewayConfigured($gatewayId = 0)
     {
         $this->load('account_gateways');
@@ -126,6 +205,15 @@ class Account extends Eloquent
     public function isEnglish()
     {
         return !$this->language_id || $this->language_id == DEFAULT_LANGUAGE;
+    }
+
+    public function hasInvoicePrefix()
+    {
+        if ( ! $this->invoice_number_prefix && ! $this->quote_number_prefix) {
+            return false;
+        }
+
+        return $this->invoice_number_prefix != $this->quote_number_prefix;
     }
 
     public function getDisplayName()
@@ -157,6 +245,15 @@ class Account extends Eloquent
         return $format;
     }
 
+    public function getMomentDateFormat()
+    {
+        $format = $this->getMomentDateTimeFormat();
+        $format = str_replace('h:mm:ss a', '', $format);
+        $format = str_replace('H:mm:ss', '', $format);
+
+        return trim($format);
+    }
+
     public function getTimezone()
     {
         if ($this->timezone) {
@@ -168,7 +265,15 @@ class Account extends Eloquent
 
     public function getDateTime($date = 'now')
     {
-        return new \DateTime($date, new \DateTimeZone($this->getTimezone()));
+        if ( ! $date) {
+            return null;
+        } elseif ( ! $date instanceof \DateTime) {
+            $date = new \DateTime($date);
+        }
+
+        $date->setTimeZone(new \DateTimeZone($this->getTimezone()));
+
+        return $date;
     }
 
     public function getCustomDateFormat()
@@ -176,13 +281,81 @@ class Account extends Eloquent
         return $this->date_format ? $this->date_format->format : DEFAULT_DATE_FORMAT;
     }
 
+    public function formatMoney($amount, $client = null, $hideSymbol = false)
+    {
+        if ($client && $client->currency_id) {
+            $currencyId = $client->currency_id;
+        } elseif ($this->currency_id) {
+            $currencyId = $this->currency_id;
+        } else {
+            $currencyId = DEFAULT_CURRENCY;
+        }
+
+        if ($client && $client->country_id) {
+            $countryId = $client->country_id;
+        } elseif ($this->country_id) {
+            $countryId = $this->country_id;
+        } else {
+            $countryId = false;
+        }
+
+        $hideSymbol = $this->show_currency_code || $hideSymbol;
+
+        return Utils::formatMoney($amount, $currencyId, $countryId, $hideSymbol);
+    }
+
+    public function getCurrencyId()
+    {
+        return $this->currency_id ?: DEFAULT_CURRENCY;
+    }
+
     public function formatDate($date)
     {
-        if (!$date) {
+        $date = $this->getDateTime($date);
+
+        if ( ! $date) {
             return null;
         }
 
         return $date->format($this->getCustomDateFormat());
+    }
+
+    public function formatDateTime($date)
+    {
+        $date = $this->getDateTime($date);
+
+        if ( ! $date) {
+            return null;
+        }
+
+        return $date->format($this->getCustomDateTimeFormat());
+    }
+
+    public function formatTime($date)
+    {
+        $date = $this->getDateTime($date);
+
+        if ( ! $date) {
+            return null;
+        }
+
+        return $date->format($this->getCustomTimeFormat());
+    }
+
+    public function getCustomTimeFormat()
+    {
+        return $this->military_time ? 'H:i' : 'g:i a';
+    }
+
+    public function getCustomDateTimeFormat()
+    {
+        $format = $this->datetime_format ? $this->datetime_format->format : DEFAULT_DATETIME_FORMAT;
+
+        if ($this->military_time) {
+            $format = str_replace('g:i a', 'H:i', $format);
+        }
+
+        return $format;
     }
 
     public function getGatewayByType($type = PAYMENT_TYPE_ANY)
@@ -211,7 +384,7 @@ class Account extends Eloquent
 
     public function hasLogo()
     {
-        return file_exists($this->getLogoPath());
+        return file_exists($this->getLogoFullPath());
     }
 
     public function getLogoPath()
@@ -221,9 +394,32 @@ class Account extends Eloquent
         return file_exists($fileName.'.png') ? $fileName.'.png' : $fileName.'.jpg';
     }
 
+    public function getLogoFullPath()
+    {
+        $fileName = public_path() . '/logo/' . $this->account_key;
+
+        return file_exists($fileName.'.png') ? $fileName.'.png' : $fileName.'.jpg';
+    }
+
+    public function getLogoURL()
+    {
+        return SITE_URL . '/' . $this->getLogoPath();
+    }
+
+    public function getToken($name)
+    {
+        foreach ($this->account_tokens as $token) {
+            if ($token->name === $name) {
+                return $token->token;
+            }
+        }
+
+        return null;
+    }
+
     public function getLogoWidth()
     {
-        $path = $this->getLogoPath();
+        $path = $this->getLogoFullPath();
         if (!file_exists($path)) {
             return 0;
         }
@@ -234,7 +430,7 @@ class Account extends Eloquent
 
     public function getLogoHeight()
     {
-        $path = $this->getLogoPath();
+        $path = $this->getLogoFullPath();
         if (!file_exists($path)) {
             return 0;
         }
@@ -243,10 +439,12 @@ class Account extends Eloquent
         return $height;
     }
 
-    public function createInvoice($entityType, $clientId = null)
+    public function createInvoice($entityType = ENTITY_INVOICE, $clientId = null)
     {
         $invoice = Invoice::createNew();
 
+        $invoice->is_recurring = false;
+        $invoice->is_quote = false;
         $invoice->invoice_date = Utils::today();
         $invoice->start_date = Utils::today();
         $invoice->invoice_design_id = $this->invoice_design_id;
@@ -275,8 +473,21 @@ class Account extends Eloquent
         return $invoice;
     }
 
+    public function getNumberPrefix($isQuote)
+    {
+        if ( ! $this->isPro()) {
+            return '';
+        }
+
+        return ($isQuote ? $this->quote_number_prefix : $this->invoice_number_prefix) ?: '';
+    }
+
     public function hasNumberPattern($isQuote)
     {
+        if ( ! $this->isPro()) {
+            return false;
+        }
+
         return $isQuote ? ($this->quote_number_pattern ? true : false) : ($this->invoice_number_pattern ? true : false);
     }
 
@@ -303,7 +514,7 @@ class Account extends Eloquent
 
         if (strstr($pattern, '{$userId}')) {
             $search[] = '{$userId}';
-            $replace[] = str_pad($invoice->user->public_id, 2, '0', STR_PAD_LEFT);
+            $replace[] = str_pad(($invoice->user->public_id + 1), 2, '0', STR_PAD_LEFT);
         }
 
         $matches = false;
@@ -316,7 +527,7 @@ class Account extends Eloquent
 
         $pattern = str_replace($search, $replace, $pattern);
 
-        if ($invoice->client->id) {
+        if ($invoice->client_id) {
             $pattern = $this->getClientInvoiceNumber($pattern, $invoice);
         }
 
@@ -330,13 +541,11 @@ class Account extends Eloquent
         }
 
         $search = [
-            //'{$clientId}',
             '{$custom1}',
             '{$custom2}',
         ];
 
         $replace = [
-            //str_pad($client->public_id, 3, '0', STR_PAD_LEFT),
             $invoice->client->custom_value1,
             $invoice->client->custom_value2,
         ];
@@ -344,20 +553,15 @@ class Account extends Eloquent
         return str_replace($search, $replace, $pattern);
     }
 
-    // if we're using a pattern we don't know the next number until a client
-    // is selected, to support this the default value is blank
-    public function getDefaultInvoiceNumber($invoice = false)
-    {
-        if ($this->hasClientNumberPattern($invoice)) {
-            return false;
-        }
-
-        return $this->getNextInvoiceNumber($invoice);
-    }
-
     public function getCounter($isQuote)
     {
         return $isQuote && !$this->share_counter ? $this->quote_number_counter : $this->invoice_number_counter;
+    }
+
+    public function previewNextInvoiceNumber($entityType = ENTITY_INVOICE)
+    {
+        $invoice = $this->createInvoice($entityType);
+        return $this->getNextInvoiceNumber($invoice);
     }
 
     public function getNextInvoiceNumber($invoice)
@@ -367,12 +571,12 @@ class Account extends Eloquent
         }
 
         $counter = $this->getCounter($invoice->is_quote);
-        $prefix = $invoice->is_quote ? $this->quote_number_prefix : $this->invoice_number_prefix;
+        $prefix = $this->getNumberPrefix($invoice->is_quote);
         $counterOffset = 0;
 
         // confirm the invoice number isn't already taken 
         do {
-            $number = $prefix.str_pad($counter, 4, "0", STR_PAD_LEFT);
+            $number = $prefix . str_pad($counter, 4, '0', STR_PAD_LEFT);
             $check = Invoice::scope(false, $this->id)->whereInvoiceNumber($number)->withTrashed()->first();
             $counter++;
             $counterOffset++;
@@ -397,10 +601,39 @@ class Account extends Eloquent
         if ($invoice->is_quote && !$this->share_counter) {
             $this->quote_number_counter += 1;
         } else {
-            $this->invoice_number_counter += 1;
+            $default = $this->invoice_number_counter;
+            $actual = Utils::parseInt($invoice->invoice_number);
+
+            if ( ! $this->isPro() && $default != $actual) {
+                $this->invoice_number_counter = $actual + 1;
+            } else {
+                $this->invoice_number_counter += 1;
+            }
         }
         
         $this->save();
+    }
+
+    public function loadAllData($updatedAt = null)
+    {
+        $map = [
+            'users' => [],
+            'clients' => ['contacts'],
+            'invoices' => ['invoice_items', 'user', 'client', 'payments'],
+            'products' => [],
+            'tax_rates' => [],
+            'expenses' => ['client', 'invoice', 'vendor'],
+            'payments' => ['invoice'],
+        ];
+
+        foreach ($map as $key => $values) {
+            $this->load([$key => function($query) use ($values, $updatedAt) {
+                $query->withTrashed()->with($values);
+                if ($updatedAt) {
+                    $query->where('updated_at', '>=', $updatedAt);
+                }
+            }]);
+        }        
     }
 
     public function loadLocalizationSettings($client = false)
@@ -450,7 +683,7 @@ class Account extends Eloquent
             'subtotal',
             'paid_to_date',
             'balance_due',
-            'amount_due',
+            'partial_due',
             'terms',
             'your_invoice',
             'quote',
@@ -459,7 +692,8 @@ class Account extends Eloquent
             'quote_number',
             'total',
             'invoice_issued_to',
-            'date',
+            'quote_issued_to',
+            //'date',
             'rate',
             'hours',
             'balance',
@@ -491,6 +725,16 @@ class Account extends Eloquent
         return $this->account_key === NINJA_ACCOUNT_KEY;
     }
 
+    public function startTrial()
+    {
+        if ( ! Utils::isNinja()) {
+            return;
+        }
+        
+        $this->pro_plan_trial = date_create()->format('Y-m-d');
+        $this->save();
+    }
+
     public function isPro()
     {
         if (!Utils::isNinjaProd()) {
@@ -502,18 +746,54 @@ class Account extends Eloquent
         }
 
         $datePaid = $this->pro_plan_paid;
+        $trialStart = $this->pro_plan_trial;
 
-        if (!$datePaid || $datePaid == '0000-00-00') {
-            return false;
-        } elseif ($datePaid == NINJA_DATE) {
+        if ($datePaid == NINJA_DATE) {
             return true;
         }
 
-        $today = new DateTime('now');
-        $datePaid = DateTime::createFromFormat('Y-m-d', $datePaid);
-        $interval = $today->diff($datePaid);
+        return Utils::withinPastTwoWeeks($trialStart) || Utils::withinPastYear($datePaid);
+    }
 
-        return $interval->y == 0;
+    public function isTrial()
+    {
+        if (!Utils::isNinjaProd()) {
+            return false;
+        }
+
+        if ($this->pro_plan_paid && $this->pro_plan_paid != '0000-00-00') {
+            return false;
+        }
+
+        return Utils::withinPastTwoWeeks($this->pro_plan_trial);
+    }
+
+    public function isEligibleForTrial()
+    {
+        return ! $this->pro_plan_trial || $this->pro_plan_trial == '0000-00-00';
+    }
+
+    public function getCountTrialDaysLeft()
+    {
+        $interval = Utils::getInterval($this->pro_plan_trial);
+        
+        return $interval ? 14 - $interval->d : 0;
+    }
+
+    public function getRenewalDate()
+    {
+        if ($this->pro_plan_paid && $this->pro_plan_paid != '0000-00-00') {
+            $date = DateTime::createFromFormat('Y-m-d', $this->pro_plan_paid);
+            $date->modify('+1 year');
+            $date = max($date, date_create());
+        } elseif ($this->isTrial()) {
+            $date = date_create();
+            $date->modify('+'.$this->getCountTrialDaysLeft().' day');
+        } else {
+            $date = date_create();
+        }
+
+        return $date->format('Y-m-d');
     }
 
     public function isWhiteLabel()
@@ -525,8 +805,27 @@ class Account extends Eloquent
         if (Utils::isNinjaProd()) {
             return self::isPro() && $this->pro_plan_paid != NINJA_DATE;
         } else {
-            return $this->pro_plan_paid == NINJA_DATE;
+            if ($this->pro_plan_paid == NINJA_DATE) {
+                return true;
+            }
+            
+            return Utils::withinPastYear($this->pro_plan_paid);
         }
+    }
+
+    public function getLogoSize()
+    {
+        if (!$this->hasLogo()) {
+            return 0;
+        }
+
+        $filename = $this->getLogoFullPath();
+        return round(File::size($filename) / 1000);
+    }
+
+    public function isLogoTooLarge()
+    {
+        return $this->getLogoSize() > MAX_LOGO_FILE_SIZE;
     }
 
     public function getSubscription($eventId)
@@ -605,13 +904,19 @@ class Account extends Eloquent
 
     public function getDefaultEmailTemplate($entityType, $message = false)
     {
-        if (strpos($entityType, 'reminder') >= 0) {
+        if (strpos($entityType, 'reminder') !== false) {
             $entityType = ENTITY_INVOICE;
         }
 
-        $template = "\$client,<p/>\r\n\r\n" .
-                    trans("texts.{$entityType}_message", ['amount' => '$amount']) . "<p/>\r\n\r\n" .
-                    "<a href=\"\$link\">\$link</a><p/>\r\n\r\n";
+        $template = "<div>\$client,</div><br>";
+
+        if ($this->isPro() && $this->email_design_id != EMAIL_DESIGN_PLAIN) {
+            $template .= "<div>" . trans("texts.{$entityType}_message_button", ['amount' => '$amount']) . "</div><br>" .
+                         "<div style=\"text-align: center;\">\$viewButton</div><br>";
+        } else {
+            $template .= "<div>" . trans("texts.{$entityType}_message", ['amount' => '$amount']) . "</div><br>" .
+                         "<div>\$viewLink</div><br>";
+        }
 
         if ($message) {
             $template .= "$message<p/>\r\n\r\n";
@@ -622,16 +927,19 @@ class Account extends Eloquent
 
     public function getEmailTemplate($entityType, $message = false)
     {
+        $template = false;
+
         if ($this->isPro()) {
             $field = "email_template_{$entityType}";
             $template = $this->$field;
-
-            if ($template) {
-                return $template;
-            }
         }
         
-        return $this->getDefaultEmailTemplate($entityType, $message);
+        if (!$template) {
+            $template = $this->getDefaultEmailTemplate($entityType, $message);
+        }
+
+        // <br/> is causing page breaks with the email designs
+        return str_replace('/>', ' />', $template);
     }
 
     public function getEmailFooter()
@@ -640,8 +948,34 @@ class Account extends Eloquent
             // Add line breaks if HTML isn't already being used
             return strip_tags($this->email_footer) == $this->email_footer ? nl2br($this->email_footer) : $this->email_footer;
         } else {
-            return "<p>" . trans('texts.email_signature') . "\n<br>\$account</p>";
+            return "<p>" . trans('texts.email_signature') . "\n<br>\$account</ p>";
         }
+    }
+
+    public function getReminderDate($reminder)
+    {
+        if ( ! $this->{"enable_reminder{$reminder}"}) {
+            return false;
+        }
+
+        $numDays = $this->{"num_days_reminder{$reminder}"};
+        $plusMinus = $this->{"direction_reminder{$reminder}"} == REMINDER_DIRECTION_AFTER ? '-' : '+';
+
+        return date('Y-m-d', strtotime("$plusMinus $numDays days"));
+    }
+
+    public function getInvoiceReminder($invoice)
+    {
+        for ($i=1; $i<=3; $i++) {
+            if ($date = $this->getReminderDate($i)) {
+                $field = $this->{"field_reminder{$i}"} == REMINDER_FIELD_DUE_DATE ? 'due_date' : 'invoice_date';
+                if ($invoice->$field == $date) {
+                    return "reminder{$i}";
+                }
+            }
+        }
+
+        return false;
     }
 
     public function showTokenCheckbox()
@@ -689,7 +1023,7 @@ class Account extends Eloquent
         return true;
     }
 
-    public function showCustomField($field, $entity)
+    public function showCustomField($field, $entity = false)
     {
         if ($this->isPro()) {
             return $this->$field ? true : false;
@@ -708,6 +1042,114 @@ class Account extends Eloquent
     public function attatchPDF()
     {
         return $this->isPro() && $this->pdf_email_attachment;
+    }
+    
+    public function getEmailDesignId()
+    {
+        return $this->isPro() ? $this->email_design_id : EMAIL_DESIGN_PLAIN;
+    }
+
+    public function clientViewCSS(){
+        $css = null;
+        
+        if ($this->isPro()) {
+            $bodyFont = $this->getBodyFontCss();
+            $headerFont = $this->getHeaderFontCss();
+            
+            $css = 'body{'.$bodyFont.'}';
+            if ($headerFont != $bodyFont) {
+                $css .= 'h1,h2,h3,h4,h5,h6,.h1,.h2,.h3,.h4,.h5,.h6{'.$headerFont.'}';
+            }
+            
+            if ((Utils::isNinja() && $this->isPro()) || $this->isWhiteLabel()) {
+                // For self-hosted users, a white-label license is required for custom CSS
+                $css .= $this->client_view_css;
+            }
+        }
+        
+        return $css;
+    }
+    
+    public function hasLargeFont()
+    {
+        foreach (['chinese', 'japanese'] as $language) {
+            if (stripos($this->getBodyFontName(), $language) || stripos($this->getHeaderFontName(), $language)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    public function getFontsUrl($protocol = ''){
+        $bodyFont = $this->getHeaderFontId();
+        $headerFont = $this->getBodyFontId();
+
+        $bodyFontSettings = Utils::getFromCache($bodyFont, 'fonts');
+        $google_fonts = array($bodyFontSettings['google_font']);
+        
+        if($headerFont != $bodyFont){
+            $headerFontSettings = Utils::getFromCache($headerFont, 'fonts');
+            $google_fonts[] = $headerFontSettings['google_font'];
+        }
+
+        return ($protocol?$protocol.':':'').'//fonts.googleapis.com/css?family='.implode('|',$google_fonts);
+    }
+    
+    public function getHeaderFontId() {
+        return ($this->isPro() && $this->header_font_id) ? $this->header_font_id : DEFAULT_HEADER_FONT;
+    }
+
+    public function getBodyFontId() {
+        return ($this->isPro() && $this->body_font_id) ? $this->body_font_id : DEFAULT_BODY_FONT;
+    }
+
+    public function getHeaderFontName(){
+        return Utils::getFromCache($this->getHeaderFontId(), 'fonts')['name'];
+    }
+    
+    public function getBodyFontName(){
+        return Utils::getFromCache($this->getBodyFontId(), 'fonts')['name'];
+    }
+    
+    public function getHeaderFontCss($include_weight = true){
+        $font_data = Utils::getFromCache($this->getHeaderFontId(), 'fonts');
+        $css = 'font-family:'.$font_data['css_stack'].';';
+            
+        if($include_weight){
+            $css .= 'font-weight:'.$font_data['css_weight'].';';
+        }
+            
+        return $css;
+    }
+    
+    public function getBodyFontCss($include_weight = true){
+        $font_data = Utils::getFromCache($this->getBodyFontId(), 'fonts');
+        $css = 'font-family:'.$font_data['css_stack'].';';
+            
+        if($include_weight){
+            $css .= 'font-weight:'.$font_data['css_weight'].';';
+        }
+            
+        return $css;
+    }
+    
+    public function getFonts(){
+        return array_unique(array($this->getHeaderFontId(), $this->getBodyFontId()));
+    }
+    
+    public function getFontsData(){
+        $data = array();
+        
+        foreach($this->getFonts() as $font){
+            $data[] = Utils::getFromCache($font, 'fonts');
+        }
+        
+        return $data;
+    }
+    
+    public function getFontFolders(){
+        return array_map(function($item){return $item['folder'];}, $this->getFontsData());
     }
 }
 

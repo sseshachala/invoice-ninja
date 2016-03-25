@@ -3,11 +3,14 @@
 @section('head')
 	@parent
 
+    @include('money_script')
         <link href="{{ asset('css/jsoneditor.min.css') }}" rel="stylesheet" type="text/css">
         <script src="{{ asset('js/jsoneditor.min.js') }}" type="text/javascript"></script>
 
-
-        <script src="{{ asset('js/pdf.built.js') }}" type="text/javascript"></script>
+    @foreach ($account->getFontFolders() as $font)
+        <script src="{{ asset('js/vfs_fonts/'.$font.'.js') }}" type="text/javascript"></script>
+    @endforeach
+        <script src="{{ asset('pdf.built.js') }}" type="text/javascript"></script>
 
       <style type="text/css">
 
@@ -19,6 +22,14 @@
             background: #FFFFFF !important;        
         }
 
+        /* http://stackoverflow.com/questions/4810841/how-can-i-pretty-print-json-using-javascript */
+        pre {outline: 1px solid #ccc; padding: 5px; margin: 5px; }
+        .string { color: green; }
+        .number { color: red; }
+        .boolean { color: blue; }
+        .null { color: gray; }
+        .key { color: black; }
+
       </style>
 
 @stop
@@ -28,6 +39,7 @@
 
   <script>
     var invoiceDesigns = {!! $invoiceDesigns !!};
+    var invoiceFonts = {!! $invoiceFonts !!};
     var invoice = {!! json_encode($invoice) !!};      
     var sections = ['content', 'styles', 'defaultStyle', 'pageMargins', 'header', 'footer'];
     var customDesign = origCustomDesign = {!! $customDesign ?: 'JSON.parse(invoiceDesigns[0].javascript);' !!};
@@ -41,6 +53,8 @@
       NINJA.primaryColor = '{!! Auth::user()->account->primary_color !!}';
       NINJA.secondaryColor = '{!! Auth::user()->account->secondary_color !!}';
       NINJA.fontSize = {!! Auth::user()->account->font_size !!};
+      NINJA.headerFont = {!! json_encode(Auth::user()->account->getHeaderFontName()) !!};
+      NINJA.bodyFont = {!! json_encode(Auth::user()->account->getBodyFontName()) !!};
 
       generatePDF(invoice, getDesignJavascript(), force, cb);
     }
@@ -72,9 +86,10 @@
     function saveEditor(data)
     {        
         setTimeout(function() {
-            customDesign[editorSection] = editor.get();           
-            refreshPDF();        
-        }, 100)                
+            customDesign[editorSection] = editor.get();
+            clearError();
+            refreshPDF();
+        }, 100)
     }
 
     function onSelectChange()
@@ -88,17 +103,34 @@
         }
 
         loadEditor(editorSection);
-        refreshPDF(true);          
+        clearError();
+        refreshPDF(true);
     }
 
     function submitForm()
     {
+        if (!NINJA.isPDFValid) {
+            return;
+        }
+
         $('#custom_design').val(JSON.stringify(customDesign));
         $('form.warn-on-exit').submit();
     }
 
-    $(function() {                       
-       refreshPDF(true);
+    window.onerror = function(e) {
+        $('#pdf-error').html(e.message ? e.message : e).show();
+        $('button.save-button').prop('disabled', true);
+        NINJA.isPDFValid = false;
+    }
+
+    function clearError() {
+        NINJA.isPDFValid = true;
+        $('#pdf-error').hide();
+        $('button.save-button').prop('disabled', false);
+    }
+
+    $(function() {
+       clearError();
       
         var container = document.getElementById("jsoneditor");
           var options = {
@@ -108,14 +140,21 @@
               saveEditor();
             }
           };
-        window.editor = new JSONEditor(container, options);      
+        window.editor = new JSONEditor(container, options);
         loadEditor('content');
-
+        
         $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
           var target = $(e.target).attr("href") // activated tab
           target = target.substring(1); // strip leading #
           loadEditor(target);
-        });        
+        });
+
+        refreshPDF(true);
+
+        @if (isset($sampleInvoice) && $sampleInvoice)
+            var sample = {!! $sampleInvoice->toJSON() !!}
+            $('#sampleData').show().html(prettyJson(sample));
+        @endif
     });
 
   </script> 
@@ -180,6 +219,11 @@
 
           <div class="panel-body" style="background-color: #fff">
             {!! trans('texts.customize_help') !!}
+
+            <pre id="sampleData" style="display:none;height:200px;padding-top:16px;"></pre>
+            @if (empty($sampleInvoice))
+                <div class="help-block">{{ trans('texts.create_invoice_for_sample') }}</div>
+            @endif
           </div>
 
          <div class="modal-footer" style="margin-top: 0px">
@@ -194,6 +238,7 @@
 
     </div>
     <div class="col-md-6">
+      <div id="pdf-error" class="alert alert-danger" style="display:none"></div>
 
       @include('invoices.pdf', ['account' => Auth::user()->account, 'pdfHeight' => 800])
 

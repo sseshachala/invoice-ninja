@@ -9,7 +9,7 @@
             },
             {
                 "stack": "$clientDetails",
-                "margin": [260, 80, 0, 0]
+                "margin": [0, 60, 0, 0]
             }
             ]
         },
@@ -128,7 +128,7 @@
         {
             "columns": [
             {
-                "text": "$accountName", "bold": true,"fontSize":30,"color":"#ffffff","margin":[40,20,0,0],"width":350
+                "text": "$accountName", "bold": true,"font":"$headerFont","fontSize":30,"color":"#ffffff","margin":[40,20,0,0],"width":350
             }
             ]
         },
@@ -142,6 +142,7 @@
         }
         ],
         "defaultStyle": {
+            "font": "$bodyFont",
             "fontSize": "$fontSize",
             "margin": [8, 4, 8, 4]
         },
@@ -232,12 +233,18 @@
                 "bold": true
             },
             "header": {
+                "font": "$headerFont",
                 "fontSize": "$fontSizeLargest",
                 "bold": true
             },
             "subheader": {
+                "font": "$headerFont",
                 "fontSize": "$fontSizeLarger"
+            },
+            "help": {
+                "fontSize": "$fontSizeSmaller",
+                "color": "#737373"
             }
         },
-        "pageMargins": [40, 80, 40, 50]
+        "pageMargins": [40, 120, 40, 50]
     }

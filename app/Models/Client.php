@@ -2,23 +2,87 @@
 
 use Utils;
 use DB;
-
+use Carbon;
+use Laracasts\Presenter\PresentableTrait;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Client extends EntityModel
 {
+    use PresentableTrait;
     use SoftDeletes;
+
+    protected $presenter = 'App\Ninja\Presenters\ClientPresenter';
+
     protected $dates = ['deleted_at'];
 
-    public static $fieldName = 'Client - Name';
-    public static $fieldPhone = 'Client - Phone';
-    public static $fieldAddress1 = 'Client - Street';
-    public static $fieldAddress2 = 'Client - Apt/Floor';
-    public static $fieldCity = 'Client - City';
-    public static $fieldState = 'Client - State';
-    public static $fieldPostalCode = 'Client - Postal Code';
-    public static $fieldNotes = 'Client - Notes';
-    public static $fieldCountry = 'Client - Country';
+    protected $fillable = [
+        'name',
+        'id_number',
+        'vat_number',
+        'work_phone',
+        'custom_value1',
+        'custom_value2',
+        'address1',
+        'address2',
+        'city',
+        'state',
+        'postal_code',
+        'country_id',
+        'private_notes',
+        'size_id',
+        'industry_id',
+        'currency_id',
+        'language_id',
+        'payment_terms',
+        'website',
+    ];
+
+    public static $fieldName = 'name';
+    public static $fieldPhone = 'work_phone';
+    public static $fieldAddress1 = 'address1';
+    public static $fieldAddress2 = 'address2';
+    public static $fieldCity = 'city';
+    public static $fieldState = 'state';
+    public static $fieldPostalCode = 'postal_code';
+    public static $fieldNotes = 'notes';
+    public static $fieldCountry = 'country';
+
+    public static function getImportColumns()
+    {
+        return [
+            Client::$fieldName,
+            Client::$fieldPhone,
+            Client::$fieldAddress1,
+            Client::$fieldAddress2,
+            Client::$fieldCity,
+            Client::$fieldState,
+            Client::$fieldPostalCode,
+            Client::$fieldCountry,
+            Client::$fieldNotes,
+            Contact::$fieldFirstName,
+            Contact::$fieldLastName,
+            Contact::$fieldPhone,
+            Contact::$fieldEmail,
+        ];
+    }
+
+    public static function getImportMap()
+    {
+        return [
+            'first' => 'first_name',
+            'last' => 'last_name',
+            'email' => 'email',
+            'mobile|phone' => 'phone',
+            'name|organization' => 'name',
+            'street2|address2' => 'address2',
+            'street|address|address1' => 'address1',
+            'city' => 'city',
+            'state|province' => 'state',
+            'zip|postal|code' => 'postal_code',
+            'country' => 'country',
+            'note' => 'notes',
+        ];
+    }
 
     public function account()
     {
@@ -27,7 +91,7 @@ class Client extends EntityModel
 
     public function user()
     {
-        return $this->belongsTo('App\Models\User');
+        return $this->belongsTo('App\Models\User')->withTrashed();
     }
 
     public function invoices()
@@ -70,6 +134,58 @@ class Client extends EntityModel
         return $this->belongsTo('App\Models\Industry');
     }
 
+    public function credits()
+    {
+        return $this->hasMany('App\Models\Credit');
+    }
+
+    public function expenses()
+    {
+        return $this->hasMany('App\Models\Expense','client_id','id')->withTrashed();
+    }
+
+    public function addContact($data, $isPrimary = false)
+    {
+        $publicId = isset($data['public_id']) ? $data['public_id'] : false;
+
+        if ($publicId && $publicId != '-1') {
+            $contact = Contact::scope($publicId)->firstOrFail();
+        } else {
+            $contact = Contact::createNew();
+            $contact->send_invoice = true;
+        }
+        
+        if (!Utils::isPro() || $this->account->enable_portal_password){
+            if(!empty($data['password']) && $data['password']!='-%unchanged%-'){
+                $contact->password = bcrypt($data['password']);
+            } else if(empty($data['password'])){
+                $contact->password = null;
+            }
+        }
+            
+        $contact->fill($data);
+        $contact->is_primary = $isPrimary;
+
+        return $this->contacts()->save($contact);
+    }
+
+    public function updateBalances($balanceAdjustment, $paidToDateAdjustment)
+    {
+        if ($balanceAdjustment === 0 && $paidToDateAdjustment === 0) {
+            return;
+        }
+
+        $this->balance = $this->balance + $balanceAdjustment;
+        $this->paid_to_date = $this->paid_to_date + $paidToDateAdjustment;
+        
+        $this->save();
+    }
+
+    public function getRoute()
+    {
+        return "/clients/{$this->public_id}";
+    }
+
     public function getTotalCredit()
     {
         return DB::table('credits')
@@ -89,8 +205,11 @@ class Client extends EntityModel
             return $this->name;
         }
         
-        $contact = $this->contacts()->first();
+        if ( ! count($this->contacts)) {
+            return '';
+        }
 
+        $contact = $this->contacts[0];
         return $contact->getDisplayName();
     }
 
@@ -161,6 +280,11 @@ class Client extends EntityModel
         return $token ? "https://dashboard.stripe.com/customers/{$token}" : false;
     }
 
+    public function getAmount()
+    {
+        return $this->balance + $this->paid_to_date;
+    }
+
     public function getCurrencyId()
     {
         if ($this->currency_id) {
@@ -178,24 +302,18 @@ class Client extends EntityModel
     {
         return $isQuote ? $this->quote_number_counter : $this->invoice_number_counter;
     }
+
+    public function markLoggedIn()
+    {
+        $this->last_login = Carbon::now()->toDateTimeString();
+        $this->save();
+    }
 }
 
-/*
-Client::created(function($client)
-{
-    Activity::createClient($client);
+Client::creating(function ($client) {
+    $client->setNullValues();
 });
-*/
 
 Client::updating(function ($client) {
-    Activity::updateClient($client);
+    $client->setNullValues();
 });
-
-Client::deleting(function ($client) {
-    Activity::archiveClient($client);
-});
-
-/*Client::restoring(function ($client) {
-    Activity::restoreClient($client);
-});
-*/

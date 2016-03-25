@@ -10,6 +10,7 @@ use Redirect;
 use Cache;
 use Session;
 use Event;
+use Schema;
 use App\Models\Language;
 use App\Models\InvoiceDesign;
 use App\Events\UserSettingsChanged;
@@ -33,8 +34,8 @@ class StartupCheck
         }
 
         // Ensure all request are over HTTPS in production
-        if (App::environment() == ENV_PRODUCTION && !Request::secure()) {
-            return Redirect::secure(Request::getRequestUri());
+        if (Utils::requireHTTPS() && !Request::secure()) {
+            return Redirect::secure(Request::path());
         }
 
         // If the database doens't yet exist we'll skip the rest
@@ -47,6 +48,9 @@ class StartupCheck
             $file = storage_path() . '/version.txt';
             $version = @file_get_contents($file);
             if ($version != NINJA_VERSION) {
+                if (version_compare(phpversion(), '5.5.9', '<')) {
+                    dd('Please update PHP to >= 5.5.9');
+                }
                 $handle = fopen($file, 'w');
                 fwrite($handle, NINJA_VERSION);
                 fclose($handle);
@@ -75,11 +79,11 @@ class StartupCheck
                             'releases_link' => link_to(RELEASES_URL, 'Invoice Ninja', ['target' => '_blank']),
                         ];
                         Session::put('news_feed_id', NEW_VERSION_AVAILABLE);
-                        Session::put('news_feed_message', trans('texts.new_version_available', $params));
+                        Session::flash('news_feed_message', trans('texts.new_version_available', $params));
                     } else {
                         Session::put('news_feed_id', $data->id);
                         if ($data->message && $data->id > Auth::user()->news_feed_id) {
-                            Session::put('news_feed_message', $data->message);
+                            Session::flash('news_feed_message', $data->message);
                         }
                     }
                 } else {
@@ -102,8 +106,10 @@ class StartupCheck
                 }
             }
         } elseif (Auth::check()) {
-//            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
-//            App::setLocale($locale);
+            $locale = Auth::user()->account->language ? Auth::user()->account->language->locale : DEFAULT_LOCALE;
+            App::setLocale($locale);
+        } elseif (session(SESSION_LOCALE)) {
+            App::setLocale(session(SESSION_LOCALE));
         }
 
         // Make sure the account/user localization settings are in the session
@@ -136,7 +142,7 @@ class StartupCheck
                 } elseif ($productId == PRODUCT_WHITE_LABEL) {
                     if ($data == 'valid') {
                         $account = Auth::user()->account;
-                        $account->pro_plan_paid = NINJA_DATE;
+                        $account->pro_plan_paid = date_create()->format('Y-m-d');
                         $account->save();
 
                         Session::flash('message', trans('texts.bought_white_label'));
@@ -146,27 +152,21 @@ class StartupCheck
         }
 
         // Check data has been cached
-        $cachedTables = [
-            'currencies' => 'App\Models\Currency',
-            'sizes' => 'App\Models\Size',
-            'industries' => 'App\Models\Industry',
-            'timezones' => 'App\Models\Timezone',
-            'dateFormats' => 'App\Models\DateFormat',
-            'datetimeFormats' => 'App\Models\DatetimeFormat',
-            'languages' => 'App\Models\Language',
-            'paymentTerms' => 'App\Models\PaymentTerm',
-            'paymentTypes' => 'App\Models\PaymentType',
-            'countries' => 'App\Models\Country',
-            'invoiceDesigns' => 'App\Models\InvoiceDesign',
-        ];
+        $cachedTables = unserialize(CACHED_TABLES);
         if (Input::has('clear_cache')) {
             Session::flash('message', 'Cache cleared');
         }
         foreach ($cachedTables as $name => $class) {
             if (Input::has('clear_cache') || !Cache::has($name)) {
+                // check that the table exists in case the migration is pending
+                if ( ! Schema::hasTable((new $class)->getTable())) {
+                    continue;
+                }
                 if ($name == 'paymentTerms') {
                     $orderBy = 'num_days';
-                } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries'])) {
+                } elseif ($name == 'fonts') {
+                    $orderBy = 'sort_order';
+                } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks'])) {
                     $orderBy = 'name';
                 } else {
                     $orderBy = 'id';

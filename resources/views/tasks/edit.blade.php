@@ -1,5 +1,12 @@
 @extends('header')
 
+@section('head')
+    @parent
+
+    <script src="{{ asset('js/jquery.datetimepicker.js') }}" type="text/javascript"></script>
+    <link href="{{ asset('css/jquery.datetimepicker.css') }}" rel="stylesheet" type="text/css"/>
+@stop
+
 @section('content')
 
     <style type="text/css">
@@ -8,6 +15,7 @@
         width: 110px;
         font-size: 14px !important;
     }
+
     </style>
 
 
@@ -45,7 +53,7 @@
                         @if (Auth::user()->account->timezone_id)
                             {{ $timezone }}
                         @else
-                            {!! link_to('/settings/company_details?focus=timezone_id', $timezone, ['target' => '_blank']) !!}
+                            {!! link_to('/settings/localization?focus=timezone_id', $timezone, ['target' => '_blank']) !!}
                         @endif
                         <p/>
 
@@ -83,13 +91,13 @@
                         <tr data-bind="event: { mouseover: showActions, mouseout: hideActions }">
                             <td style="padding: 0px 12px 12px 0 !important">
                                 <div data-bind="css: { 'has-error': !isStartValid() }">
-                                    <input type="text" data-bind="value: startTime.pretty, event:{ change: $root.refresh }" 
+                                    <input type="text" data-bind="dateTimePicker: startTime.pretty, event:{ change: $root.refresh }" 
                                         class="form-control time-input" placeholder="{{ trans('texts.start_time') }}"/>
                                 </div>
                             </td>
                             <td style="padding: 0px 12px 12px 0 !important">
                                 <div data-bind="css: { 'has-error': !isEndValid() }">
-                                    <input type="text" data-bind="value: endTime.pretty, event:{ change: $root.refresh }" 
+                                    <input type="text" data-bind="dateTimePicker: endTime.pretty, event:{ change: $root.refresh }" 
                                         class="form-control time-input" placeholder="{{ trans('texts.end_time') }}"/>
                                 </div>
                             </td>
@@ -117,6 +125,9 @@
         @if ($task && $task->is_running)
             {!! Button::success(trans('texts.save'))->large()->appendIcon(Icon::create('floppy-disk'))->withAttributes(['id' => 'save-button']) !!}            
             {!! Button::primary(trans('texts.stop'))->large()->appendIcon(Icon::create('stop'))->withAttributes(['id' => 'stop-button']) !!}            
+        @elseif ($task && $task->trashed())
+            {!! Button::normal(trans('texts.cancel'))->large()->asLinkTo(URL::to('/tasks'))->appendIcon(Icon::create('remove-circle')) !!}
+            {!! Button::success(trans('texts.restore'))->large()->withAttributes(['onclick' => 'submitAction("restore")'])->appendIcon(Icon::create('cloud-download')) !!}
         @else
             {!! Button::normal(trans('texts.cancel'))->large()->asLinkTo(URL::to('/tasks'))->appendIcon(Icon::create('remove-circle')) !!}
             @if ($task)
@@ -127,7 +138,7 @@
                       ->large()
                       ->dropup() !!}
             @else
-                {!! Button::success(trans('texts.save'))->large()->appendIcon(Icon::create('floppy-disk'))->withAttributes(['id' => 'save-button', 'style' => 'display:none']) !!}
+                {!! Button::success(trans('texts.save'))->large()->appendIcon(Icon::create('floppy-disk'))->withAttributes(['id' => 'save-button']) !!}
                 {!! Button::success(trans('texts.start'))->large()->appendIcon(Icon::create('play'))->withAttributes(['id' => 'start-button']) !!}
             @endif
         @endif
@@ -136,6 +147,45 @@
     {!! Former::close() !!}
 
     <script type="text/javascript">
+
+    // Add moment support to the datetimepicker
+    Date.parseDate = function( input, format ){
+      return moment(input, format).toDate();
+    };
+    Date.prototype.dateFormat = function( format ){
+      return moment(this).format(format);
+    };
+
+    ko.bindingHandlers.dateTimePicker = {
+      init: function (element, valueAccessor, allBindingsAccessor) {
+         var value = ko.utils.unwrapObservable(valueAccessor());
+         // http://xdsoft.net/jqplugins/datetimepicker/
+         $(element).datetimepicker({
+            lang: '{{ Utils::getLocaleRegion() }}',
+            lazyInit: true,
+            validateOnBlur: false,
+            step: 30,
+            format: '{{ $datetimeFormat }}',
+            formatDate: '{{ $account->getMomentDateFormat() }}',
+            formatTime: '{{ $account->military_time ? 'H:mm' : 'h:mm A' }}',
+            onSelectTime: function(current_time, $input){
+                current_time.setSeconds(0);
+                $(element).datetimepicker({
+                    value: current_time
+                });
+            }
+         });
+
+         $(element).change(function() {
+            var value = valueAccessor();
+            value($(element).val());
+         })
+      },
+      update: function (element, valueAccessor) {
+        var value = ko.utils.unwrapObservable(valueAccessor());
+        if (value) $(element).val(value);
+      }
+    }
 
     var clients = {!! $clients !!};
     var timeLabels = {};
@@ -297,6 +347,11 @@
             self.refresh();
         }
 
+        self.removeItems = function() {
+            self.time_log.removeAll();
+            self.refresh();
+        }
+
         self.refresh = function() {
             var hasEmpty = false;
             var lastTime = 0;
@@ -365,9 +420,21 @@
             } else {
                 $('#datetime-details').fadeIn();
             }
-            $('#start-button').toggle();
-            $('#save-button').toggle();
+            setButtonsVisible();
         })
+
+        function setButtonsVisible() {
+            //model.removeItems();
+            var val = $('input[name=task_type]:checked').val();
+            if (val == 'timer') {
+                $('#start-button').show();
+                $('#save-button').hide();
+            } else {
+                $('#start-button').hide();
+                $('#save-button').show();
+            }
+        }
+        setButtonsVisible();
 
         $('#start-button').click(function() {
             submitAction('start');

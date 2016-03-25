@@ -10,8 +10,6 @@ use App\Events\UserLoggedIn;
 use App\Http\Controllers\Controller;
 use App\Ninja\Repositories\AccountRepository;
 use App\Services\AuthService;
-use Illuminate\Contracts\Auth\Guard;
-use Illuminate\Contracts\Auth\Registrar;
 use Illuminate\Foundation\Auth\AuthenticatesAndRegistersUsers;
 
 class AuthController extends Controller {
@@ -29,7 +27,6 @@ class AuthController extends Controller {
 
 	use AuthenticatesAndRegistersUsers;
 
-    protected $loginPath = '/login';
     protected $redirectTo = '/dashboard';
     protected $authService;
     protected $accountRepo;
@@ -41,15 +38,37 @@ class AuthController extends Controller {
 	 * @param  \Illuminate\Contracts\Auth\Registrar  $registrar
 	 * @return void
 	 */
-	public function __construct(Guard $auth, Registrar $registrar, AccountRepository $repo, AuthService $authService)
+	public function __construct(AccountRepository $repo, AuthService $authService)
 	{
-		$this->auth = $auth;
-		$this->registrar = $registrar;
         $this->accountRepo = $repo;
         $this->authService = $authService;
 
 		//$this->middleware('guest', ['except' => 'getLogout']);
 	}
+
+    public function validator(array $data)
+    {
+        return Validator::make($data, [
+            'name' => 'required|max:255',
+            'email' => 'required|email|max:255|unique:users',
+            'password' => 'required|confirmed|min:6',
+        ]);
+    }
+
+    /**
+     * Create a new user instance after a valid registration.
+     *
+     * @param  array  $data
+     * @return User
+     */
+    public function create(array $data)
+    {
+        return User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => bcrypt($data['password']),
+        ]);
+    }
 
     public function authLogin($provider, Request $request)
     {
@@ -75,10 +94,11 @@ class AuthController extends Controller {
 
     public function postLoginWrapper(Request $request)
     {
+
         $userId = Auth::check() ? Auth::user()->id : null;
         $user = User::where('email', '=', $request->input('email'))->first();
 
-        if ($user && $user->failed_logins >= 3) {
+        if ($user && $user->failed_logins >= MAX_FAILED_LOGINS) {
             Session::flash('error', trans('texts.invalid_credentials'));
             return redirect()->to('login');
         }
@@ -90,15 +110,15 @@ class AuthController extends Controller {
 
             $users = false;
             // we're linking a new account
-            if ($userId && Auth::user()->id != $userId) {
+            if ($request->link_accounts && $userId && Auth::user()->id != $userId) {
                 $users = $this->accountRepo->associateAccounts($userId, Auth::user()->id);
-                Session::flash('warning', trans('texts.associated_accounts'));
+                Session::flash('message', trans('texts.associated_accounts'));
             // check if other accounts are linked
             } else {
                 $users = $this->accountRepo->loadAccounts(Auth::user()->id);
             }
-            
             Session::put(SESSION_USER_ACCOUNTS, $users);
+
         } elseif ($user) {
             $user->failed_logins = $user->failed_logins + 1;
             $user->save();
@@ -106,6 +126,7 @@ class AuthController extends Controller {
 
         return $response;
     }
+
 
     public function getLogoutWrapper()
     {

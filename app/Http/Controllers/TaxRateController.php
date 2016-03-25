@@ -12,9 +12,25 @@ use Session;
 use Redirect;
 
 use App\Models\TaxRate;
+use App\Services\TaxRateService;
+use App\Ninja\Repositories\TaxRateRepository;
+
+use App\Http\Requests\CreateTaxRateRequest;
+use App\Http\Requests\UpdateTaxRateRequest;
 
 class TaxRateController extends BaseController
 {
+    protected $taxRateService;
+    protected $taxRateRepo;
+
+    public function __construct(TaxRateService $taxRateService, TaxRateRepository $taxRateRepo)
+    {
+        //parent::__construct();
+
+        $this->taxRateService = $taxRateService;
+        $this->taxRateRepo = $taxRateRepo;
+    }
+
     public function index()
     {
         return Redirect::to('settings/' . ACCOUNT_TAX_RATES);
@@ -22,28 +38,7 @@ class TaxRateController extends BaseController
 
     public function getDatatable()
     {
-        $query = DB::table('tax_rates')
-                ->where('tax_rates.account_id', '=', Auth::user()->account_id)
-                ->where('tax_rates.deleted_at', '=', null)
-                ->select('tax_rates.public_id', 'tax_rates.name', 'tax_rates.rate');
-
-        return Datatable::query($query)
-                  ->addColumn('name', function ($model) { return link_to('tax_rates/'.$model->public_id.'/edit', $model->name); })
-                  ->addColumn('rate', function ($model) { return $model->rate . '%'; })
-                  ->addColumn('dropdown', function ($model) {
-                    return '<div class="btn-group tr-action" style="visibility:hidden;">
-                        <button type="button" class="btn btn-xs btn-default dropdown-toggle" data-toggle="dropdown">
-                          '.trans('texts.select').' <span class="caret"></span>
-                        </button>
-                        <ul class="dropdown-menu" role="menu">
-                        <li><a href="'.URL::to('tax_rates/'.$model->public_id).'/edit">'.uctrans('texts.edit_tax_rate').'</a></li>
-                        <li class="divider"></li>
-                        <li><a href="'.URL::to('tax_rates/'.$model->public_id).'/archive">'.uctrans('texts.archive_tax_rate').'</a></li>
-                      </ul>
-                    </div>';
-                  })
-                  ->orderColumns(['name', 'rate'])
-                  ->make();
+        return $this->taxRateService->getDatatable(Auth::user()->account_id);
     }
 
     public function edit($publicId)
@@ -70,38 +65,30 @@ class TaxRateController extends BaseController
         return View::make('accounts.tax_rate', $data);
     }
 
-    public function store()
+    public function store(CreateTaxRateRequest $request)
     {
-        return $this->save();
-    }
+        $this->taxRateRepo->save($request->input());
 
-    public function update($publicId)
-    {
-        return $this->save($publicId);
-    }
-
-    private function save($publicId = false)
-    {
-        if ($publicId) {
-            $taxRate = TaxRate::scope($publicId)->firstOrFail();
-        } else {
-            $taxRate = TaxRate::createNew();
-        }
-
-        $taxRate->name = trim(Input::get('name'));
-        $taxRate->rate = Utils::parseFloat(Input::get('rate'));
-        $taxRate->save();
-
-        $message = $publicId ? trans('texts.updated_tax_rate') : trans('texts.created_tax_rate');
-        Session::flash('message', $message);
-
+        Session::flash('message', trans('texts.created_tax_rate'));
         return Redirect::to('settings/' . ACCOUNT_TAX_RATES);
     }
 
-    public function archive($publicId)
+    public function update(UpdateTaxRateRequest $request, $publicId)
     {
-        $tax_rate = TaxRate::scope($publicId)->firstOrFail();
-        $tax_rate->delete();
+        $taxRate = TaxRate::scope($publicId)->firstOrFail();
+
+        $this->taxRateRepo->save($request->input(), $taxRate);
+
+        Session::flash('message', trans('texts.updated_tax_rate'));
+        return Redirect::to('settings/' . ACCOUNT_TAX_RATES);
+    }
+
+
+    public function bulk()
+    {
+        $action = Input::get('bulk_action');
+        $ids = Input::get('bulk_public_id');
+        $count = $this->taxRateService->bulk($ids, $action);
 
         Session::flash('message', trans('texts.archived_tax_rate'));
 

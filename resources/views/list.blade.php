@@ -3,15 +3,20 @@
 @section('content')
 
 	{!! Former::open($entityType . 's/bulk')->addClass('listForm') !!}
+
 	<div style="display:none">
 		{!! Former::text('action') !!}
-		{!! Former::text('statusId') !!}
-		{!! Former::text('id') !!}
+        {!! Former::text('public_id') !!}
 	</div>
 
-    @if ($entityType == ENTITY_TASK)
-        {!! Button::primary(trans('texts.invoice'))->withAttributes(['class'=>'invoice', 'onclick' =>'submitForm("invoice")'])->appendIcon(Icon::create('check')) !!}
-    @endif
+	@if (\App\Models\Invoice::canCreate())
+		@if ($entityType == ENTITY_TASK)
+			{!! Button::primary(trans('texts.invoice'))->withAttributes(['class'=>'invoice', 'onclick' =>'submitForm("invoice")'])->appendIcon(Icon::create('check')) !!}
+		@endif
+		@if ($entityType == ENTITY_EXPENSE)
+			{!! Button::primary(trans('texts.invoice'))->withAttributes(['class'=>'invoice', 'onclick' =>'submitForm("invoice")'])->appendIcon(Icon::create('check')) !!}
+		@endif
+	@endif
 
 	{!! DropdownButton::normal(trans('texts.archive'))->withContents([
 		      ['label' => trans('texts.archive_'.$entityType), 'url' => 'javascript:submitForm("archive")'],
@@ -24,28 +29,27 @@
 	</label>
 
 	<div id="top_right_buttons" class="pull-right">
-		<input id="tableFilter" type="text" style="width:140px;margin-right:17px;background-color: white !important" class="form-control pull-left" placeholder="{{ trans('texts.filter') }}"/>
-        @if (Auth::user()->isPro() && $entityType == ENTITY_INVOICE)        
+		<input id="tableFilter" type="text" style="width:140px;margin-right:17px;background-color: white !important" 
+            class="form-control pull-left" placeholder="{{ trans('texts.filter') }}" value="{{ Input::get('filter') }}"/>
+        @if (Auth::user()->isPro() && $entityType == ENTITY_INVOICE)
             {!! Button::normal(trans('texts.quotes'))->asLinkTo(URL::to('/quotes'))->appendIcon(Icon::create('list')) !!}
-        @elseif ($entityType == ENTITY_CLIENT)        
+            {!! Button::normal(trans('texts.recurring'))->asLinkTo(URL::to('/recurring_invoices'))->appendIcon(Icon::create('list')) !!}
+        @elseif ($entityType == ENTITY_EXPENSE)
+            {!! Button::normal(trans('texts.vendors'))->asLinkTo(URL::to('/vendors'))->appendIcon(Icon::create('list')) !!}
+        @elseif ($entityType == ENTITY_CLIENT)
             {!! Button::normal(trans('texts.credits'))->asLinkTo(URL::to('/credits'))->appendIcon(Icon::create('list')) !!}
         @endif
 
-        {!! Button::primary(trans("texts.new_$entityType"))->asLinkTo(URL::to("/{$entityType}s/create"))->appendIcon(Icon::create('plus-sign')) !!}
+		@if (Auth::user()->hasPermission('create_all'))
+        	{!! Button::primary(trans("texts.new_$entityType"))->asLinkTo(URL::to("/{$entityType}s/create"))->appendIcon(Icon::create('plus-sign')) !!}
+		@endif
         
 	</div>
-
-    @if (isset($secEntityType))
-		{!! Datatable::table()		
-	    	->addColumn($secColumns)
-	    	->setUrl(route('api.' . $secEntityType . 's'))    	
-	    	->setOptions('sPaginationType', 'bootstrap')
-	    	->render('datatable') !!}    
-	@endif	
 
 	{!! Datatable::table()		
     	->addColumn($columns)
     	->setUrl(route('api.' . $entityType . 's'))    	
+        ->setCustomValues('rightAlign', isset($rightAlign) ? $rightAlign : [])
     	->setOptions('sPaginationType', 'bootstrap')
         ->setOptions('aaSorting', [[isset($sortCol) ? $sortCol : '1', 'desc']])
     	->render('datatable') !!}
@@ -66,43 +70,46 @@
 	}
 
 	function deleteEntity(id) {
-		$('#id').val(id);
+		$('#public_id').val(id);
 		submitForm('delete');
 	}
 
 	function archiveEntity(id) {
-		$('#id').val(id);
+		$('#public_id').val(id);
 		submitForm('archive');
 	}
 
     function restoreEntity(id) {
-        $('#id').val(id);
+        $('#public_id').val(id);
         submitForm('restore');
     }
     function convertEntity(id) {
-        $('#id').val(id);
+        $('#public_id').val(id);
         submitForm('convert');
     }
 
-	function markEntity(id, statusId) {
-		$('#id').val(id);
-		$('#statusId').val(statusId);
-		submitForm('mark');
+	function markEntity(id) {
+		$('#public_id').val(id);
+		submitForm('markSent');
 	}
 
     function stopTask(id) {
-        $('#id').val(id);
+        $('#public_id').val(id);
         submitForm('stop');
     }
 
-    function invoiceTask(id) {
-        $('#id').val(id);
+    function invoiceEntity(id) {
+        $('#public_id').val(id);
         submitForm('invoice');
     }
 
 	function setTrashVisible() {
 		var checked = $('#trashed').is(':checked');
-		window.location = '{{ URL::to('view_archive/' . $entityType) }}' + (checked ? '/true' : '/false');
+		var url = '{{ URL::to('view_archive/' . $entityType) }}' + (checked ? '/true' : '/false');
+
+        $.get(url, function(data) {
+            refreshDatatable();
+        })
 	}
 
     $(function() {
@@ -117,9 +124,6 @@
             }
             tableFilter = val;
             oTable0.fnFilter(val);
-            @if (isset($secEntityType))
-                oTable1.fnFilter(val);
-            @endif
         }
 
         $('#tableFilter').on('keyup', function(){
@@ -129,8 +133,12 @@
 
             searchTimeout = setTimeout(function() {
                 filterTable($('#tableFilter').val());
-            }, 500);                   
+            }, 500);
         })
+
+        if ($('#tableFilter').val()) {
+            filterTable($('#tableFilter').val());
+        }
 
         window.onDatatableReady = function() {      
             $(':checkbox').click(function() {
@@ -146,16 +154,8 @@
                 }
             });
 
-            $('tbody tr').mouseover(function() {
-                $(this).closest('tr').find('.tr-action').css('visibility','visible');
-            }).mouseout(function() {
-                $dropdown = $(this).closest('tr').find('.tr-action');
-                if (!$dropdown.hasClass('open')) {
-                    $dropdown.css('visibility','hidden');
-                }           
-            });
-
-        }   
+            actionListHandler();
+        }
 
         $('.archive, .invoice').prop('disabled', true);
         $('.archive:not(.dropdown-toggle)').click(function() {

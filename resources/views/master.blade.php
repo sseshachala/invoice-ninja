@@ -1,8 +1,13 @@
 <!DOCTYPE html>
 <html lang="{{App::getLocale()}}">
 <head>
-    <title>{{ isset($title) ? ($title . ' | Invoice Ninja') : ('Invoice Ninja | ' . trans('texts.app_title')) }}</title> 
-    <meta name="description" content="{{ isset($description) ? $description : trans('texts.app_description') }}" />
+    @if (isset($hideLogo) && $hideLogo)
+        <title>{{ trans('texts.client_portal') }}</title>
+    @else
+        <title>{{ isset($title) ? ($title . ' | Invoice Ninja') : ('Invoice Ninja | ' . trans('texts.app_title')) }}</title> 
+        <meta name="description" content="{{ isset($description) ? $description : trans('texts.app_description') }}" />
+        <link href="{{ asset('favicon-v2.png') }}" rel="shortcut icon" type="image/png">
+    @endif
 
     <!-- Source: https://github.com/hillelcoren/invoice-ninja -->
     <!-- Version: {{ NINJA_VERSION }} -->
@@ -19,29 +24,44 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="msapplication-config" content="none"/> 
 
-    <link href="//fonts.googleapis.com/css?family=Roboto:400,700,900,100&subset=latin,latin-ext" rel="stylesheet" type="text/css">
-    <link href="//fonts.googleapis.com/css?family=Roboto+Slab:400,300,700&subset=latin,latin-ext" rel="stylesheet" type="text/css">
-    <link href="{{ asset('favicon.png?test') }}" rel="shortcut icon">
     <link rel="canonical" href="{{ NINJA_APP_URL }}/{{ Request::path() }}" />
 
-    <script src="{{ asset('js/built.js') }}?no_cache={{ NINJA_VERSION }}" type="text/javascript"></script>    
+    <script src="{{ asset('built.js') }}?no_cache={{ NINJA_VERSION }}" type="text/javascript"></script>    
 
     <script type="text/javascript">
         var NINJA = NINJA || {};
         NINJA.fontSize = 9;
+        NINJA.isRegistered = {{ \Utils::isRegistered() ? 'true' : 'false' }};
+        
+        window.onerror = function (errorMsg, url, lineNumber, column, error) {
+            if (errorMsg.indexOf('Script error.') > -1) {
+                return;
+            }
 
-        NINJA.isRegistered = {{ \Utils::isRegistered() ? 'true' : 'false' }};    
-
-        window.onerror = function(e) {
-            var message = e.message ? (e.message + ' - ' + e.filename + ': ' + e.lineno) : e;
             try {
-                $.ajax({
-                    type: 'GET',
-                    url: '{{ URL::to('log_error') }}',
-                    data: 'error='+encodeURIComponent(message)+'&url='+encodeURIComponent(window.location)
-                });     
+                // Use StackTraceJS to parse the error context 
+                if (error) {
+                    var message = error.message ? error.message : error;
+                    StackTrace.fromError(error).then(function(result) {
+                        var gps = new StackTraceGPS();
+                        gps.findFunctionName(result[0]).then(function(result) {
+                            logError(errorMsg + ': ' + JSON.stringify(result));
+                        });
+                    });
+                } else {
+                    logError(errorMsg);
+                }
             } catch(err) {}
+
             return false;
+        }
+
+        function logError(message) {
+            $.ajax({
+                type: 'GET',
+                url: '{{ URL::to('log_error') }}',
+                data: 'error='+encodeURIComponent(message)+'&url='+encodeURIComponent(window.location)
+            });
         }
 
         /* Set the defaults for DataTables initialisation */
@@ -57,12 +77,13 @@
             }
         } );
         
-        /*   
+        /* This causes problems with some languages. ie, fr_CA
+		var appLocale = '{{App::getLocale()}}';
         $.extend( true, $.fn.datepicker.defaults, {
-            language:'{{App::getLocale()}}'
+			language: appLocale.replace("_", "-")
         });
         */
-        
+
         @if (env('FACEBOOK_PIXEL'))
             <!-- Facebook Pixel Code -->
             !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -107,7 +128,7 @@
 
 </head>
 
-<body>
+<body class="body">
 
     @if (isset($_ENV['TAG_MANAGER_KEY']) && $_ENV['TAG_MANAGER_KEY'])  
     <!-- Google Tag Manager -->
@@ -158,6 +179,10 @@
             @if (Session::get('trackEventAction') === '/buy_pro_plan')
                 window._fbq.push(['track', '{{ env('FACEBOOK_PIXEL_BUY_PRO') }}', {'value':'{{ PRO_PLAN_PRICE }}.00','currency':'USD'}]);
             @endif
+        @endif
+
+        @if (Session::has('onReady'))
+            {{ Session::get('onReady') }}
         @endif
     });
     $('form').submit(function() {

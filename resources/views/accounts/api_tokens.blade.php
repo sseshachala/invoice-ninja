@@ -4,16 +4,8 @@
 	@parent
 	@include('accounts.nav', ['selected' => ACCOUNT_API_TOKENS, 'advanced' => true])
 
-  {!! Former::open('tokens/delete')->addClass('user-form') !!}
-
-  <div style="display:none">
-    {!! Former::text('tokenPublicId') !!}
-  </div>
-  {!! Former::close() !!}
-
-
   <div class="pull-right">
-  {!! Button::normal(trans('texts.documentation'))->asLinkTo(NINJA_WEB_URL.'/knowledgebase/api-documentation/')->withAttributes(['target' => '_blank'])->appendIcon(Icon::create('info-sign')) !!}
+  {!! Button::normal(trans('texts.documentation'))->asLinkTo(NINJA_WEB_URL.'/api-documentation/')->withAttributes(['target' => '_blank'])->appendIcon(Icon::create('info-sign')) !!}
   @if (Utils::isNinja())  
     {!! Button::normal(trans('texts.zapier'))->asLinkTo(ZAPIER_URL)->withAttributes(['target' => '_blank']) !!}
   @endif
@@ -29,6 +21,8 @@
     </label>
   -->
 
+  @include('partials.bulk_form', ['entityType' => ENTITY_TOKEN])
+
   {!! Datatable::table()
       ->addColumn(
         trans('texts.name'),
@@ -43,30 +37,23 @@
       ->render('datatable') !!}
 
   <script>
-  window.onDatatableReady = function() {
-    $('tbody tr').mouseover(function() {
-      $(this).closest('tr').find('.tr-action').css('visibility','visible');
-    }).mouseout(function() {
-      $dropdown = $(this).closest('tr').find('.tr-action');
-      if (!$dropdown.hasClass('open')) {
-        $dropdown.css('visibility','hidden');
-      }
-    });
-  }
+
+    window.onDatatableReady = actionListHandler;
 
     function setTrashVisible() {
         var checked = $('#trashed').is(':checked');
-        window.location = '{!! URL::to('view_archive/token') !!}' + (checked ? '/true' : '/false');
+        var url = '{{ URL::to('view_archive/token') }}' + (checked ? '/true' : '/false');
+
+        $.get(url, function(data) {
+            refreshDatatable();
+        })
     }
 
-  function deleteToken(id) {
-    if (!confirm("{!! trans('texts.are_you_sure') !!}")) {
-      return;
-    }
-
-    $('#tokenPublicId').val(id);
-    $('form.user-form').submit();
-  }
   </script>
 
+  @if (Utils::isNinja() && !Utils::isReseller())
+    <p>&nbsp;</p>
+    <script src="https://zapier.com/zapbook/embed/widget.js?services=invoice-ninja&container=false&limit=6"></script>
+  @endif
+  
 @stop

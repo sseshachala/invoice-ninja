@@ -22,13 +22,25 @@
 
       <center id="designThumbs">
         <p>&nbsp;</p>
-        <a href="{{ asset('/images/designs/business.png') }}" data-lightbox="more-designs" data-title="Business"><img src="{{ asset('/images/designs/business_thumb.png') }}"/></a>&nbsp;&nbsp;&nbsp;&nbsp;
-        <a href="{{ asset('/images/designs/creative.png') }}" data-lightbox="more-designs" data-title="Creative"><img src="{{ asset('/images/designs/creative_thumb.png') }}"/></a>&nbsp;&nbsp;&nbsp;&nbsp;
-        <a href="{{ asset('/images/designs/elegant.png') }}" data-lightbox="more-designs" data-title="Elegant"><img src="{{ asset('/images/designs/elegant_thumb.png') }}"/></a>
+        <a href="{{ asset('/images/designs/business.png') }}" data-lightbox="more-designs" data-title="Business">
+            <img src="{{ BLANK_IMAGE }}" data-src="{{ asset('/images/designs/business_thumb.png') }}"/>
+        </a>&nbsp;&nbsp;&nbsp;&nbsp;
+        <a href="{{ asset('/images/designs/creative.png') }}" data-lightbox="more-designs" data-title="Creative">
+            <img src="{{ BLANK_IMAGE }}" data-src="{{ asset('/images/designs/creative_thumb.png') }}"/>
+        </a>&nbsp;&nbsp;&nbsp;&nbsp;
+        <a href="{{ asset('/images/designs/elegant.png') }}" data-lightbox="more-designs" data-title="Elegant">
+            <img src="{{ BLANK_IMAGE }}" data-src="{{ asset('/images/designs/elegant_thumb.png') }}"/>
+        </a>
         <p>&nbsp;</p>
-        <a href="{{ asset('/images/designs/hipster.png') }}" data-lightbox="more-designs" data-title="Hipster"><img src="{{ asset('/images/designs/hipster_thumb.png') }}"/></a>&nbsp;&nbsp;&nbsp;&nbsp;
-        <a href="{{ asset('/images/designs/playful.png') }}" data-lightbox="more-designs" data-title="Playful"><img src="{{ asset('/images/designs/playful_thumb.png') }}"/></a>&nbsp;&nbsp;&nbsp;&nbsp;
-        <a href="{{ asset('/images/designs/photo.png') }}" data-lightbox="more-designs" data-title="Photo"><img src="{{ asset('/images/designs/photo_thumb.png') }}"/></a>        
+        <a href="{{ asset('/images/designs/hipster.png') }}" data-lightbox="more-designs" data-title="Hipster">
+            <img src="{{ BLANK_IMAGE }}" data-src="{{ asset('/images/designs/hipster_thumb.png') }}"/>
+        </a>&nbsp;&nbsp;&nbsp;&nbsp;
+        <a href="{{ asset('/images/designs/playful.png') }}" data-lightbox="more-designs" data-title="Playful">
+            <img src="{{ BLANK_IMAGE }}" data-src="{{ asset('/images/designs/playful_thumb.png') }}"/>
+        </a>&nbsp;&nbsp;&nbsp;&nbsp;
+        <a href="{{ asset('/images/designs/photo.png') }}" data-lightbox="more-designs" data-title="Photo">
+            <img src="{{ BLANK_IMAGE }}" data-src="{{ asset('/images/designs/photo_thumb.png') }}"/>
+        </a>
         <p>&nbsp;</p>
       </center>
 
@@ -50,20 +62,20 @@
 <script type="text/javascript">
   window.logoImages = {};
   
-  logoImages.imageLogo1 = "{{ HTML::image_data('images/report_logo1.jpg') }}";
+  logoImages.imageLogo1 = "{{ Form::image_data('images/report_logo1.jpg') }}";
   logoImages.imageLogoWidth1 =120;
   logoImages.imageLogoHeight1 = 40
 
-  logoImages.imageLogo2 = "{{ HTML::image_data('images/report_logo2.jpg') }}";
+  logoImages.imageLogo2 = "{{ Form::image_data('images/report_logo2.jpg') }}";
   logoImages.imageLogoWidth2 =325/2;
   logoImages.imageLogoHeight2 = 81/2;
 
-  logoImages.imageLogo3 = "{{ HTML::image_data('images/report_logo3.jpg') }}";
+  logoImages.imageLogo3 = "{{ Form::image_data('images/report_logo3.jpg') }}";
   logoImages.imageLogoWidth3 =325/2;
   logoImages.imageLogoHeight3 = 81/2;
 
-  @if (file_exists($account->getLogoPath()))
-  window.accountLogo = "{{ HTML::image_data($account->getLogoPath()) }}";
+  @if ($account->hasLogo())
+  window.accountLogo = "{{ Form::image_data($account->getLogoPath()) }}";
   if (window.invoice) {
     invoice.image = window.accountLogo;
     invoice.imageWidth = {{ $account->getLogoWidth() }};
@@ -72,15 +84,24 @@
   @endif
 
   var NINJA = NINJA || {};
-  @if (Utils::isPro())
+  @if ($account->isPro())
       NINJA.primaryColor = "{{ $account->primary_color }}";
       NINJA.secondaryColor = "{{ $account->secondary_color }}";
       NINJA.fontSize = {{ $account->font_size }};
+      NINJA.headerFont = {!! json_encode($account->getHeaderFontName()) !!};
+      NINJA.bodyFont = {!! json_encode($account->getBodyFontName()) !!};
+  @else
+      NINJA.primaryColor = "";
+      NINJA.secondaryColor = "";
+      NINJA.fontSize = 9;
+      NINJA.headerFont = "Roboto";
+      NINJA.bodyFont = "Roboto";    
   @endif
+  
   var invoiceLabels = {!! json_encode($account->getInvoiceLabels()) !!};
 
   if (window.invoice) {
-    invoiceLabels.item = invoice.has_tasks ? invoiceLabels.date : invoiceLabels.item_orig;
+    //invoiceLabels.item = invoice.has_tasks ? invoiceLabels.date : invoiceLabels.item_orig;
     invoiceLabels.quantity = invoice.has_tasks ? invoiceLabels.hours : invoiceLabels.quantity_orig;
     invoiceLabels.unit_cost = invoice.has_tasks ? invoiceLabels.rate : invoiceLabels.unit_cost_orig;
   }
@@ -89,14 +110,17 @@
   var needsRefresh = false;
 
   function refreshPDF(force) {
+    //console.log('refresh PDF - force: ' + force + ' ' + (new Date()).getTime())
     return getPDFString(refreshPDFCB, force);
   }
   
   function refreshPDFCB(string) {
     if (!string) return;
     PDFJS.workerSrc = '{{ asset('js/pdf_viewer.worker.js') }}';
-    if ({{ Auth::check() && Auth::user()->force_pdfjs ? 'false' : 'true' }} && (isFirefox || (isChrome && !isChromium))) { 
-      $('#theFrame').attr('src', string).show();    
+    var forceJS = {{ Auth::check() && Auth::user()->force_pdfjs ? 'false' : 'true' }};
+    // Temporarily workaround for: https://code.google.com/p/chromium/issues/detail?id=574648 
+    if (forceJS && (isFirefox || (isChrome && (!isChrome48 || {{ isset($viewPDF) && $viewPDF ? 'true' : 'false' }})))) { 
+      $('#theFrame').attr('src', string).show();
     } else {      
       if (isRefreshing) {
         //needsRefresh = true;
@@ -128,6 +152,7 @@
   }
 
   function showMoreDesigns() {
+    loadImages('#designThumbs');
     trackEvent('/account', '/view_more_designs');
     $('#moreDesignsModal').modal('show');
   }

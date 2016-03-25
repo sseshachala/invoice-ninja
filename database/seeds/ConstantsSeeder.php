@@ -50,12 +50,6 @@ class ConstantsSeeder extends Seeder
 		Theme::create(array('name' => 'united'));
 		Theme::create(array('name' => 'yeti'));
 
-		InvoiceStatus::create(array('name' => 'Draft'));
-		InvoiceStatus::create(array('name' => 'Sent'));
-		InvoiceStatus::create(array('name' => 'Viewed'));
-		InvoiceStatus::create(array('name' => 'Partial'));
-		InvoiceStatus::create(array('name' => 'Paid'));		
-
 		Frequency::create(array('name' => 'Weekly'));
 		Frequency::create(array('name' => 'Two weeks'));
 		Frequency::create(array('name' => 'Four weeks'));
@@ -103,13 +97,13 @@ class ConstantsSeeder extends Seeder
 		Size::create(array('name' => '101 - 500'));
 		Size::create(array('name' => '500+'));		
 
-        	PaymentTerm::create(array('num_days' => 7, 'name' => 'Net 7'));
-		PaymentTerm::create(array('num_days' => 10, 'name' => 'Net 10'));
-		PaymentTerm::create(array('num_days' => 14, 'name' => 'Net 14'));
-		PaymentTerm::create(array('num_days' => 15, 'name' => 'Net 15'));
-		PaymentTerm::create(array('num_days' => 30, 'name' => 'Net 30'));
-		PaymentTerm::create(array('num_days' => 60, 'name' => 'Net 60'));
-		PaymentTerm::create(array('num_days' => 90, 'name' => 'Net 90'));
+    	PaymentTerm::create(array('num_days' => 7, 'name' => 'Net 7', 'public_id' => 1));
+		PaymentTerm::create(array('num_days' => 10, 'name' => 'Net 10', 'public_id' => 2));
+		PaymentTerm::create(array('num_days' => 14, 'name' => 'Net 14', 'public_id' => 3));
+		PaymentTerm::create(array('num_days' => 15, 'name' => 'Net 15', 'public_id' => 4));
+		PaymentTerm::create(array('num_days' => 30, 'name' => 'Net 30', 'public_id' => 5));
+		PaymentTerm::create(array('num_days' => 60, 'name' => 'Net 60', 'public_id' => 6));
+		PaymentTerm::create(array('num_days' => 90, 'name' => 'Net 90', 'public_id' => 7));
         
 		PaymentLibrary::create(['name' => 'Omnipay']);
         	PaymentLibrary::create(['name' => 'PHP-Payments [Deprecated]']);
@@ -183,7 +177,7 @@ class ConstantsSeeder extends Seeder
 		    'America/Santiago'     => "(GMT-04:00) Santiago",
 		    'Canada/Newfoundland'  => "(GMT-03:30) Newfoundland",
 		    'America/Buenos_Aires' => "(GMT-03:00) Buenos Aires",
-		    'Greenland'            => "(GMT-03:00) Greenland",
+		    'America/Godthab'      => "(GMT-03:00) Greenland",
 		    'Atlantic/Stanley'     => "(GMT-02:00) Stanley",
 		    'Atlantic/Azores'      => "(GMT-01:00) Azores",
 		    'Atlantic/Cape_Verde'  => "(GMT-01:00) Cape Verde Is.",

@@ -3,6 +3,7 @@
 @section('head')
   @parent
 
+  @include('money_script')
   <script src="{!! asset('js/d3.min.js') !!}" type="text/javascript"></script>   
 
   <style type="text/css">
@@ -126,16 +127,15 @@
     //console.log(JSON.stringify(products));
     
     var arc = d3.svg.arc()
-      .innerRadius(function(d) { return d.r - 2 })
+      .innerRadius(function(d) { return d.r })
       .outerRadius(function(d) { return d.r - 8 })
       .startAngle(0);
 
     var fullArc = d3.svg.arc()
-      .innerRadius(function(d) { return d.r - 3 })
+      .innerRadius(function(d) { return d.r - 1 })
       .outerRadius(function(d) { return d.r - 7 })
       .startAngle(0)
       .endAngle(2 * Math.PI);
-
 
     var diameter = 800,
     format = d3.format(",d");
@@ -232,7 +232,7 @@
         .attr("class", "no-pointer-events")
         .attr("class", "animate-grow")
         .attr("d", arc)
-        .style("fill", function(d, i) { return 'grey'; });
+        .style("fill", function(d, i) { return '#2e9e49'; });
 
       d3.selectAll("path.animate-grow")
         .transition()
@@ -244,7 +244,7 @@
         .transition()
         .duration(1000)      
         .style("fill", function(d, i) { 
-          return d.displayAge == -1 ? 'grey' : color(d.displayAge);
+          return d.displayAge == -1 ? 'white' : 'red';
         });                
 
       selection.exit().remove();

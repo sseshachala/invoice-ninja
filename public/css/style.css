@@ -3,7 +3,7 @@ body { background: #f8f8f8 !important;
     font-size: 15px;
 }
 html {
-  overflow-y: scroll;
+  /* overflow-y: scroll; */
 }
 .bold { font-weight: 700; }
 a {color:#0b4d78;}
@@ -89,7 +89,8 @@ th:last-child {
 }
 
 tr {border: none;}
-th {border-left: 1px solid #d26b26; }
+thead th {border-left: 1px solid #d26b26;}
+tbody td {border-left: 1px solid #FFFFFF;}
 .table>thead>tr>th, .table>tbody>tr>th, .table>tfoot>tr>th, .table>thead>tr>td, .table>tbody>tr>td, .table>tfoot>tr>td {
 vertical-align: middle;
 border-top: none;
@@ -145,7 +146,7 @@ line-height: 20px;
 .datepicker table {font-size: 12px; border-spacing:2px;}
 .datepicker td, .datepicker th { width:30px; }
 .datepicker table tr td.active.active, .datepicker table tr td.active:hover.active {
-background-color: #3498DB;
+background-color: #0b4d78;
     background-image:none;
 }
 .datepicker table tr td.today { color: #333; background-color: #edd71e !important; background-image:none; text-shadow:none;}
@@ -160,7 +161,7 @@ padding: 20px;
 }
 .modal-header {
 border-bottom: none;
-background-color: #3498DB;
+background-color: #0b4d78;
     padding: 20px;
     color: #fff;
 }
@@ -275,10 +276,6 @@ border-radius: 3px;
 
 /*new*/
 
-div {
-    word-break: break-word;
-}
-
 div.input-group {
     word-break: normal;
 }
@@ -335,8 +332,8 @@ table td {
     max-width: 250px;
 }
 .pagination>.active>a, .pagination>.active>span, .pagination>.active>a:hover, .pagination>.active>span:hover, .pagination>.active>a:focus, .pagination>.active>span:focus {
-background-color: #3498DB;
-border-color: #3498DB;
+background-color: #0b4d78;
+border-color: #0b4d78;
 }
 .pagination>li:first-child>a, .pagination>li:first-child>span {
 border-bottom-left-radius: 3px;
@@ -399,10 +396,20 @@ font-weight: bold;
     color: #fff;
 }
 .navbar {
-  background-color: #3498DB !important;
+  background-color: #0b4d78 !important;
   background-image: none;
   background-repeat: no-repeat;
   filter: none;
+}
+
+.navbar,
+.panel-default,
+ul.dropdown-menu,
+.twitter-typeahead .tt-menu,
+canvas {
+    x-moz-box-shadow: 0 0 1px 1px rgba(0,0,0,.05);
+    x-webkit-box-shadow: 0 0 1px 1px rgba(0,0,0,.05); 
+    box-shadow: 0 0 1px 1px rgba(0,0,0,.05);
 }
 
 .navbar .active > a {
@@ -430,7 +437,7 @@ font-weight: bold;
     left: -6px;
 }
 .navbar .dropdown-menu {
-    border-top: 1px solid #3498DB;
+    border-top: 1px solid #0b4d78;
 }
 .navbar-brand {
 padding-top:20px;
@@ -479,7 +486,7 @@ background-clip: padding-box;
 
 
 .active-clients {
-    background-color: #3498DB;
+    background-color: #0b4d78;
     background-image:url('../images/activeclients.png');
     background-position:center;
     background-repeat: no-repeat;
@@ -787,8 +794,24 @@ box-shadow:         0px 0px 15px 0px rgba(0, 5, 5, 0.2);
    .large-dialog {
         width: 960px;
    }
-   .hide-desktop 
-   {
+   .hide-desktop {
+        display: none;
+   }
+}
+
+/* Style to fix navigation by show icon instead of name */
+@media only screen and (min-width : 1200px) {
+   .nav-account-icon {
+        display: none;
+   }
+}
+@media only screen and (max-width : 992px) {
+   .nav-account-icon {
+        display: none;
+   }
+}
+@media only screen and (max-width : 1200px) and (min-width: 992px) {
+   .nav-account-name {
         display: none;
    }
 }
@@ -890,7 +913,7 @@ div.checkbox > label {
 
 .panel-heading {
     /*background-color: #e37329 !important;*/
-    background-color: #3498DB !important;
+    background-color: #0b4d78 !important;
 }
 
 div.alert {
@@ -918,7 +941,7 @@ div.dataTables_length label {
 
 a .glyphicon,
 button .glyphicon {
-    padding-left: 8px;
+    padding-left: 12px;
 }
 
 .pro-plan-modal {
@@ -1017,6 +1040,14 @@ ul.user-accounts a:hover div.remove {
     width: 350px; 
 }
 
+.smaller {
+    font-size: .9em;
+}
+
+td.right {
+  text-align: right;
+}
+
 /* Show selected section in settings nav */
 .list-group-item.selected:before {
     position: absolute;
@@ -1026,4 +1057,8 @@ ul.user-accounts a:hover div.remove {
     width: 2px;
     content: "";
     background-color: #e37329;
+}
+
+div.panel-body div.panel-body {
+    padding-bottom: 0px;
 }
