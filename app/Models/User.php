@@ -29,8 +29,6 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
      */
     protected $table = 'users';
 
-    protected $connection = 'mysql-b2b';
-
     /**
      * The attributes that are mass assignable.
      *

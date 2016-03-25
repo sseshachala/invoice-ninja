@@ -4,7 +4,7 @@
 @section('head')
 
   <link href="//fonts.googleapis.com/css?family=Roboto:400,700,900,100|Roboto+Slab:400,300,700&subset=latin,latin-ext" rel="stylesheet" type="text/css">
-  <link href="{{ asset('css/built.css') }}?no_cache={{ NINJA_VERSION }}" rel="stylesheet" type="text/css"/>
+  <link href="{{ asset('css/built.css') }}?no_cache={{ NINJA_VERSION }}" rel="stylesheet" type="text/css"/>    
 
   <style type="text/css">
 
@@ -264,7 +264,7 @@
     $('#navbar-options').hide();
     $('#search-form').show();
     $('#search').focus();
-
+    
     if (!window.loadedSearchData) {
         trackEvent('/activity', '/search');
         $.get('{{ URL::route('getSearchData') }}', function(data) {
@@ -280,7 +280,7 @@
             templates: {
               header: '&nbsp;<span style="font-weight:600;font-size:16px">{{ Auth::user()->account->custom_client_label1 }}</span>'
             }
-          }
+          }          
           @endif
           @if (Auth::check() && Auth::user()->account->custom_client_label2)
           ,{
@@ -290,7 +290,7 @@
             templates: {
               header: '&nbsp;<span style="font-weight:600;font-size:16px">{{ Auth::user()->account->custom_client_label2 }}</span>'
             }
-          }
+          }          
           @endif
           @foreach (['clients', 'contacts', 'invoices', 'quotes', 'navigation'] as $type)
           ,{
@@ -304,12 +304,12 @@
           @endforeach
           ).on('typeahead:selected', function(element, datum, name) {
             window.location = datum.url;
-          }).focus();
+          }).focus(); 
           window.loadedSearchData = true;
         });
     }
   }
-
+  
   function hideSearch() {
     $('#search-form').hide();
     $('#navbar-options').show();
@@ -436,8 +436,8 @@
                 @endif
               <span class="caret"></span>
             </div>
-            <span class="glyphicon glyphicon-user nav-account-icon" style="padding-left:0px"
-                title="{{ Auth::user()->account->getDisplayName() }}"/>
+            <span class="glyphicon glyphicon-user nav-account-icon" style="padding-left:0px" 
+                title="{{ Auth::user()->account->getDisplayName() }}"/>            
           </button>			
           <ul class="dropdown-menu user-accounts">
             @if (session(SESSION_USER_ACCOUNTS))
@@ -473,7 +473,6 @@
                     'selected' => true,
                 ])
             @endif            
-
             <li class="divider"></li>
             @if (Utils::isAdmin())
               @if (count(session(SESSION_USER_ACCOUNTS)) > 1)
@@ -509,7 +508,7 @@
       </ul>
 
 
-      <ul class="nav navbar-nav navbar-right navbar-search">
+      <ul class="nav navbar-nav navbar-right navbar-search"> 
         <li class="dropdown">
           <a href="#" onclick="showSearch()">
             <span class="glyphicon glyphicon-search" title="{{ trans('texts.search') }}"/>
@@ -531,7 +530,7 @@
 
       <form id="search-form" class="navbar-form navbar-right" role="search" style="display:none">
         <div class="form-group">
-          <input type="text" id="search" style="width: 240px;padding-top:0px;padding-bottom:0px"
+          <input type="text" id="search" style="width: 240px;padding-top:0px;padding-bottom:0px" 
             class="form-control" placeholder="{{ trans('texts.search') . ': ' . trans('texts.search_hotkey')}}">
         </div>
       </form>
@@ -600,7 +599,7 @@
           {!! Former::text('go_pro') !!}
         </div>
 
-
+        
         <div class="row signup-form">
             <div class="col-md-11 col-md-offset-1">
                 {!! Former::checkbox('terms_checkbox')->label(' ')->text(trans('texts.agree_to_terms', ['terms' => '<a href="'.URL::to('terms').'" target="_blank">'.trans('texts.terms_of_service').'</a>']))->raw() !!}
@@ -610,7 +609,7 @@
                 <div class="col-md-4 col-md-offset-1">
                     <h4>{{ trans('texts.sign_up_using') }}</h4><br/>
                     @foreach (App\Services\AuthService::$providers as $provider)
-                    <a href="{{ URL::to('auth/' . $provider) }}" class="btn btn-primary btn-block"
+                    <a href="{{ URL::to('auth/' . $provider) }}" class="btn btn-primary btn-block" 
                         onclick="setSocialLoginProvider('{{ strtolower($provider) }}')" id="{{ strtolower($provider) }}LoginButton">
                         <i class="fa fa-{{ strtolower($provider) }}"></i> &nbsp;
                         {{ $provider }}
@@ -623,12 +622,12 @@
                     <div style="border-right:thin solid #CCCCCC;height:110px;width:8px;margin-top:10px;"></div>
                 </div>
                 <div class="col-md-6">
-            @else
+            @else 
                 <div class="col-md-12">
             @endif
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.large', 1) }}
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.small', 1) }}
-
+                
                 {!! Former::text('new_first_name')
                         ->placeholder(trans('texts.first_name'))
                         ->autocomplete('given-name')
@@ -644,7 +643,7 @@
                 {!! Former::password('new_password')
                         ->placeholder(trans('texts.password'))
                         ->label(' ') !!}
-
+                
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.large', 4) }}
                 {{ Former::setOption('TwitterBootstrap3.labelWidths.small', 4) }}
             </div>
@@ -655,9 +654,9 @@
         </div>
 
         {!! Former::close() !!}
-
-
-
+        
+        
+        
         <center><div id="errorTaken" style="display:none">&nbsp;<br/>{{ trans('texts.email_taken') }}</div></center>
         <br/>
 
@@ -752,21 +751,13 @@
 
 @endif
 
-@if (!Utils::isNinjaProd())
-<p>&nbsp;</p>
 </div>
 <br/>
 <div class="container">
-  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
-
-  {!! link_to(RELEASES_URL, 'v' . NINJA_VERSION, ['target' => '_blank']) !!} | 
-  @if (Auth::user()->account->isWhiteLabel())  
-  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a> -
-
 @if (Utils::isNinjaProd())
   @if (Auth::check() && Auth::user()->isTrial())
     {!! trans(Auth::user()->account->getCountTrialDaysLeft() == 0 ? 'texts.trial_footer_last_day' : 'texts.trial_footer', [
-            'count' => Auth::user()->account->getCountTrialDaysLeft(),
+            'count' => Auth::user()->account->getCountTrialDaysLeft(), 
             'link' => '<a href="javascript:submitProPlan()">' . trans('texts.click_here') . '</a>'
         ]) !!}
   @endif
@@ -774,8 +765,8 @@
   {{ trans('texts.powered_by') }}
   {{-- Per our license, please do not remove or modify this section. --}}
   {!! link_to('https://www.invoiceninja.com/?utm_source=powered_by', 'InvoiceNinja.com', ['target' => '_blank', 'title' => 'invoiceninja.com']) !!} -
-  {!! link_to(RELEASES_URL, 'v' . NINJA_VERSION, ['target' => '_blank', 'title' => trans('texts.trello_roadmap')]) !!} |
-  @if (Auth::user()->account->isWhiteLabel())
+  {!! link_to(RELEASES_URL, 'v' . NINJA_VERSION, ['target' => '_blank', 'title' => trans('texts.trello_roadmap')]) !!} | 
+  @if (Auth::user()->account->isWhiteLabel())  
     {{ trans('texts.white_labeled') }}
   @else
     <a href="#" onclick="loadImages('#whiteLabelModal');$('#whiteLabelModal').modal('show');">{{ trans('texts.white_label_link') }}</a>
@@ -802,7 +793,7 @@
             </div>
           </div>
 
-          <div class="modal-footer" id="signUpFooter" style="margin-top: 0px">
+          <div class="modal-footer" id="signUpFooter" style="margin-top: 0px">          
             <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('texts.close') }} </button>
             {{-- DropdownButton::success_lg(trans('texts.buy'), [
                 ['url' => URL::to(""), 'label' => trans('texts.pay_with_paypal')],
@@ -814,9 +805,6 @@
       </div>
     </div>
   @endif
-  {{ trans('texts.powered_by') }} <a href="https://b2bsphere.com" target="_blank">b2bsphere.com</a>
-
-
 </div>
 @endif
 

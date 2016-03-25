@@ -79,6 +79,7 @@ Route::get('/password/reset/{token}', array('as' => 'forgot', 'uses' => 'Auth\Pa
 Route::post('/password/reset', array('as' => 'forgot', 'uses' => 'Auth\PasswordController@postReset'));
 Route::get('/user/confirm/{code}', 'UserController@confirm');
 
+
 // Client auth
 Route::get('/client/login', array('as' => 'login', 'uses' => 'ClientAuth\AuthController@getLogin'));
 Route::post('/client/login', array('as' => 'login', 'uses' => 'ClientAuth\AuthController@postLogin'));
@@ -88,7 +89,14 @@ Route::post('/client/forgot', array('as' => 'forgot', 'uses' => 'ClientAuth\Pass
 Route::get('/client/password/reset/{invitation_key}/{token}', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@getReset'));
 Route::post('/client/password/reset', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@postReset'));
 
-get('/autologin', ['as' => 'autologin', 'uses' => 'Auth\AutoLoginController@login']);
+// Client auth
+Route::get('/client/login', array('as' => 'login', 'uses' => 'ClientAuth\AuthController@getLogin'));
+Route::post('/client/login', array('as' => 'login', 'uses' => 'ClientAuth\AuthController@postLogin'));
+Route::get('/client/logout', array('as' => 'logout', 'uses' => 'ClientAuth\AuthController@getLogout'));
+Route::get('/client/forgot', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@getEmail'));
+Route::post('/client/forgot', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@postEmail'));
+Route::get('/client/password/reset/{invitation_key}/{token}', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@getReset'));
+Route::post('/client/password/reset', array('as' => 'forgot', 'uses' => 'ClientAuth\PasswordController@postReset'));
 
 
 if (Utils::isNinja()) {
