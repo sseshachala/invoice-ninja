@@ -61,6 +61,8 @@ Route::get('claim_license', 'PaymentController@claim_license');
 Route::post('signup/validate', 'AccountController@checkEmail');
 Route::post('signup/submit', 'AccountController@submitSignup');
 
+Route::get('autologin', 'Auth\AutoLoginController@login');
+
 Route::get('/auth/{provider}', 'Auth\AuthController@authLogin');
 Route::get('/auth_unlink', 'Auth\AuthController@authUnlink');
 
