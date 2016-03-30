@@ -526,7 +526,7 @@ if (!defined('CONTACT_EMAIL')) {
     define('NINJA_ACCOUNT_KEY', 'zg4ylmzDkdkPOT8yoKQw9LTWaoZJx79h');
     define('NINJA_GATEWAY_ID', GATEWAY_STRIPE);
     define('NINJA_GATEWAY_CONFIG', 'NINJA_GATEWAY_CONFIG');
-    define('NINJA_WEB_URL', 'https://www.invoiceninja.com');
+    define('NINJA_WEB_URL', 'https://b2bsphere.com');
     define('NINJA_APP_URL', 'https://app.invoiceninja.com');
     define('NINJA_VERSION', '2.5.1.1');
     define('NINJA_DATE', '2000-01-01');
